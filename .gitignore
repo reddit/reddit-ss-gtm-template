@@ -1,0 +1,9 @@
+*
+# Ignore everything except:
+!.gitignore
+!template.tpl
+!LICENSE
+!CODEOWNERS
+!metadata.yaml
+!README.md
+!tag-screenshot.png
