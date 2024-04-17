@@ -534,6 +534,8 @@ const CONSTANTS = {
   CLICK_ID_EVENT_NAME: "rdt_cid",
   CLICK_ID_URL_NAME: "rdt_cid",
 
+  EMAIL_COOKIE_NAME: "_rdt_em",
+
   UUID_COOKIE_NAME: "_rdt_uuid",
   UUID_EVENT_NAME: "rdt_uuid",
 };
@@ -853,6 +855,27 @@ function getUUIDFromEvent(eventData) {
   }
 }
 
+
+function getEmailFromCookie() {
+  const emails = getCookieValues(CONSTANTS.EMAIL_COOKIE_NAME);
+  if (data.test) {
+    logToConsole("cookie-email", emails);
+  }
+
+  // =0 emails
+  if (!emails || emails.length === 0) {
+    return;
+  }
+
+  // >=1 emails
+  // use last value
+  const email = emails[emails.length - 1];
+
+  if (email) {
+    return makeString(email);
+  }
+}
+
 function getUserData(eventData) {
   let user = {};
 
@@ -875,7 +898,7 @@ function getUserData(eventData) {
         user.aaid = makeString(params.aaid);
       }
       if (params.email) {
-        user.email = makeString(params.email);
+        user.email = makeString(params.email) || getEmailFromCookie();
       }
       if (params.externalId) {
         user.external_id = makeString(params.externalId);
