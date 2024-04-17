@@ -765,8 +765,8 @@ function getClickIdFromCookie() {
   }
 
   // >=1 click IDs
-  // use last value
-  const clickID = clickIds[clickIds.length - 1];
+  // use first value
+  const clickID = clickIds[0];
 
   if (clickID) {
     return makeString(clickID);
@@ -868,8 +868,8 @@ function getEmailFromCookie() {
   }
 
   // >=1 emails
-  // use last value
-  const email = emails[emails.length - 1];
+  // use first value
+  const email = emails[0];
 
   if (email) {
     return makeString(email);
