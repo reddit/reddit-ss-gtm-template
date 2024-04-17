@@ -829,7 +829,7 @@ function getUUIDFromCookie() {
       const ts = makeNumber(parts[0]);
       if (!oldestTs || (ts && ts < oldestTs)) {
         oldestTs = ts;
-        oldestUUID = uuid;
+        oldestUUID = parts[1];
       }
     }
   }
