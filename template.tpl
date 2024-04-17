@@ -530,7 +530,7 @@ const CONSTANTS = {
     "https://ads-api.reddit.com/api/v2.0/conversions/events/",
   API_CONVERSIONS_ENDPOINT_TIMEOUT: 3 * MILLIS_IN_SECONDS,
 
-  CLICK_ID_COOKIE_NAME: "rdt_cid",
+  CLICK_ID_COOKIE_NAME: "_rdt_cid",
   CLICK_ID_EVENT_NAME: "rdt_cid",
   CLICK_ID_URL_NAME: "rdt_cid",
 
