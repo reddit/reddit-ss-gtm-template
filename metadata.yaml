@@ -2,6 +2,8 @@ homepage: "https://www.redditinc.com/advertising"
 documentation: "https://reddit.my.site.com/helpcenter/s/article/Install-the-Reddit-Pixel-on-your-website#GTM"
 versions:
   # Latest Version
+  - sha: b7f5f9a7794124efda17f60bf221cf4d5014d2ef
+    changeNotes: Support latest changes
+  # Older versions
   - sha: c9359848c48e5ae3cf62ab8bb72c8bbd0047c85a
     changeNotes: Initial release.
-  # Older versions
