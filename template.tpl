@@ -530,9 +530,11 @@ const CONSTANTS = {
     "https://ads-api.reddit.com/api/v2.0/conversions/events/",
   API_CONVERSIONS_ENDPOINT_TIMEOUT: 3 * MILLIS_IN_SECONDS,
 
-  CLICK_ID_COOKIE_NAME: "rdt_cid",
+  CLICK_ID_COOKIE_NAME: "_rdt_cid",
   CLICK_ID_EVENT_NAME: "rdt_cid",
   CLICK_ID_URL_NAME: "rdt_cid",
+
+  EMAIL_COOKIE_NAME: "_rdt_em",
 
   UUID_COOKIE_NAME: "_rdt_uuid",
   UUID_EVENT_NAME: "rdt_uuid",
@@ -763,8 +765,8 @@ function getClickIdFromCookie() {
   }
 
   // >=1 click IDs
-  // use last value
-  const clickID = clickIds[clickIds.length - 1];
+  // use first value
+  const clickID = clickIds[0];
 
   if (clickID) {
     return makeString(clickID);
@@ -829,7 +831,7 @@ function getUUIDFromCookie() {
       const ts = makeNumber(parts[0]);
       if (!oldestTs || (ts && ts < oldestTs)) {
         oldestTs = ts;
-        oldestUUID = uuid;
+        oldestUUID = parts[1];
       }
     }
   }
@@ -850,6 +852,27 @@ function getUUIDFromEvent(eventData) {
 
   if (uuid) {
     return makeString(uuid);
+  }
+}
+
+
+function getEmailFromCookie() {
+  const emails = getCookieValues(CONSTANTS.EMAIL_COOKIE_NAME);
+  if (data.test) {
+    logToConsole("cookie-email", emails);
+  }
+
+  // =0 emails
+  if (!emails || emails.length === 0) {
+    return;
+  }
+
+  // >=1 emails
+  // use first value
+  const email = emails[0];
+
+  if (email) {
+    return makeString(email);
   }
 }
 
@@ -875,7 +898,7 @@ function getUserData(eventData) {
         user.aaid = makeString(params.aaid);
       }
       if (params.email) {
-        user.email = makeString(params.email);
+        user.email = makeString(params.email) || getEmailFromCookie();
       }
       if (params.externalId) {
         user.external_id = makeString(params.externalId);
@@ -1075,7 +1098,11 @@ ___SERVER_PERMISSIONS___
               },
               {
                 "type": 1,
-                "string": "rdt_cid"
+                "string": "_rdt_cid"
+              },
+              {
+                "type": 1,
+                "string": "_rdt_em"
               }
             ]
           }
