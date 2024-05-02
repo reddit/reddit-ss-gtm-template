@@ -1098,7 +1098,11 @@ ___SERVER_PERMISSIONS___
               },
               {
                 "type": 1,
-                "string": "rdt_cid"
+                "string": "_rdt_cid"
+              },
+              {
+                "type": 1,
+                "string": "_rdt_em"
               }
             ]
           }
