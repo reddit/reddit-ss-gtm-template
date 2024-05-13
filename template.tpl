@@ -441,36 +441,15 @@ ___TEMPLATE_PARAMETERS___
     "subParams": [
       {
         "type": "TEXT",
-        "name": "clientId",
-        "displayName": "Client ID",
+        "name": "conversionToken",
+        "displayName": "Conversion Token",
         "simpleValueType": true,
         "valueValidators": [
           {
             "type": "NON_EMPTY"
           }
-        ]
-      },
-      {
-        "type": "TEXT",
-        "name": "appSecret",
-        "displayName": "App Secret",
-        "simpleValueType": true,
-        "valueValidators": [
-          {
-            "type": "NON_EMPTY"
-          }
-        ]
-      },
-      {
-        "type": "TEXT",
-        "name": "refreshToken",
-        "displayName": "Refresh Token",
-        "simpleValueType": true,
-        "valueValidators": [
-          {
-            "type": "NON_EMPTY"
-          }
-        ]
+        ],
+        "notSetText": "Please generate a Conversion Token in your Reddit Ad account."
       },
       {
         "type": "CHECKBOX",
@@ -503,12 +482,12 @@ const makeString = require("makeString");
 const makeTableMap = require("makeTableMap");
 const parseUrl = require("parseUrl");
 const sendHttpRequest = require("sendHttpRequest");
-const templateDataStorage = require("templateDataStorage");
-const toBase64 = require("toBase64");
 
 const TAG_VERSION = "v1.0";
 
 const AD_ACCOUNT_ID = encodeUriComponent(data.id);
+
+const CONVERSION_TOKEN = data.conversionToken;
 
 const containerVersion = getContainerVersion();
 const containerId = containerVersion.containerId;
@@ -522,9 +501,6 @@ const CONSTANTS = {
     "SGTM:" + containerId + ":" + TAG_VERSION + " (by " + AD_ACCOUNT_ID + ")",
 
   CAPI_PARTNER: "SGTM",
-
-  API_ACCESS_TOKEN_ENDPOINT: "https://www.reddit.com/api/v1/access_token",
-  API_ACCESS_TOKEN_ENDPOINT_TIMEOUT: 3 * MILLIS_IN_SECONDS,
 
   API_CONVERSIONS_ENDPOINT:
     "https://ads-api.reddit.com/api/v2.0/conversions/events/",
@@ -542,149 +518,38 @@ const CONSTANTS = {
 
 const DEFAULT_EVENT_TIME = getTimestampMillis();
 
-function handleAuthentication() {
-  return Promise.create((resolve) => {
-    const nowInMillis = getTimestampMillis();
-
-    const accessToken = makeString(
-      templateDataStorage.getItemCopy("accessToken")
-    );
-    const expiryInMillis = makeInteger(
-      templateDataStorage.getItemCopy("expiryInMillis")
-    );
-
-    if (
-      // accessToken does not exist
-      !accessToken ||
-      // expiry moment is unknown
-      !expiryInMillis ||
-      // expiry moment has passed
-      expiryInMillis - nowInMillis <
-        CONSTANTS.ACCESS_TOKEN_EXPIRY_THRESHOLD_MILLIS
-    ) {
-      if (data.test) {
-        logToConsole("API token missing so refresh is required.");
-      }
-      return resolve(
-        sendAuthRequest(data.clientId, data.appSecret, data.refreshToken)
-          .then(handleAuthResponse)
-          .then(saveAuthData)
-      );
-    } else {
-      if (data.test) {
-        logToConsole("API token exists so refresh is not required.");
-      }
-      return resolve();
-    }
-  });
-}
-
-function sendAuthRequest(clientId, appSecret, refreshToken) {
-  const token = toBase64(clientId + ":" + appSecret);
-
-  const headers = {
-    "Content-Type": "application/x-www-form-urlencoded",
-    "User-Agent": CONSTANTS.API_USER_AGENT,
-    Authorization: "Basic " + token,
-  };
-
-  const body = "grant_type=refresh_token&refresh_token=" + refreshToken;
-
-  return sendHttpRequest(
-    CONSTANTS.API_ACCESS_TOKEN_ENDPOINT,
-    {
-      method: "POST",
-      timeout: CONSTANTS.API_ACCESS_TOKEN_ENDPOINT_TIMEOUT,
-      headers: headers,
-    },
-    body
-  );
-}
-
-function handleAuthResponse(response) {
-  const statusCode = response.statusCode;
-  const body = JSON.parse(response.body);
-
-  if (!body) {
-    logToConsole("API token refresh failed and returned no data.");
-    return data.gtmOnFailure();
-  }
-
-  const error = body.error;
-  const message = body.message;
-
-  if (statusCode != 200 || error) {
-    logToConsole("API token refresh failed with status code: " + statusCode);
-    if (error) {
-      logToConsole("API token refresh failed with error: " + error);
-    }
-    if (message) {
-      logToConsole("API token refresh failed with message: " + message);
-    }
-    return data.gtmOnFailure();
-  } else if (data.test) {
-    logToConsole("API token refresh succeeded and returned data.");
-  }
-
-  const accessToken = body.access_token;
-  const expiresIn = makeInteger(body.expires_in); // seconds from now
-  const scope = body.scope;
-
-  if (!accessToken || !expiresIn) {
-    logToConsole("API token refresh returned invalid data.");
-    return data.gtmOnFailure();
-  }
-
-  if (!scope || scope.indexOf("adsconversions") == -1) {
-    logToConsole("API token has insufficient scope: " + scope);
-    return data.gtmOnFailure();
-  }
-
-  const expiresInMillis = expiresIn * MILLIS_IN_SECONDS;
-  const nowInMillis = getTimestampMillis();
-  const expiryInMillis = nowInMillis + expiresInMillis;
-
-  return { accessToken: accessToken, expiryInMillis: expiryInMillis };
-}
-
-function saveAuthData(authData) {
-  templateDataStorage.setItemCopy("accessToken", authData.accessToken);
-  templateDataStorage.setItemCopy("expiryInMillis", authData.expiryInMillis);
-}
-
-function readAuthData() {
-  return templateDataStorage.getItemCopy("accessToken");
-}
 
 function collectEventData() {
-  const eventData = getAllEventData();
+    return Promise.create((resolve) => {
+        const eventData = getAllEventData();
 
-  if (data.test) {
-    logToConsole("data", data);
-    logToConsole("eventData", eventData);
-  }
+        if (data.test) {
+            logToConsole("data", data);
+            logToConsole("eventData", eventData);
+        }
 
-  const eventAtMs = DEFAULT_EVENT_TIME;
-  const eventType = getEventType();
+        const eventAtMs = DEFAULT_EVENT_TIME;
+        const eventType = getEventType();
 
-  const clickId = getClickId(eventData);
+        const clickId = getClickId(eventData);
 
-  const eventMetadata = getEventMetadata();
+        const eventMetadata = getEventMetadata();
 
-  const userData = getUserData(eventData);
+        const userData = getUserData(eventData);
 
-  const mappedEventData = {
-    event_at_ms: eventAtMs,
-    event_type: eventType,
-    click_id: clickId,
-    event_metadata: eventMetadata,
-    user: userData,
-  };
-  if (data.test) {
-    logToConsole("mappedEventData", mappedEventData);
-  }
+        const mappedEventData = {
+            event_at_ms: eventAtMs,
+            event_type: eventType,
+            click_id: clickId,
+            event_metadata: eventMetadata,
+            user: userData,
+        };
+        if (data.test) {
+            logToConsole("mappedEventData", mappedEventData);
+        }
 
-  return mappedEventData;
+        return resolve(mappedEventData);
+    });
 }
 
 function getEventType() {
@@ -957,7 +822,7 @@ function sendCAPIRequest(eventData) {
   const headers = {
     "Content-Type": "application/json",
     "User-Agent": CONSTANTS.API_USER_AGENT,
-    Authorization: "Bearer " + readAuthData(),
+    Authorization: "Bearer " + CONVERSION_TOKEN,
   };
 
   const body = JSON.stringify({
@@ -996,8 +861,7 @@ function handleCAPIResponse(response) {
   }
 }
 
-return handleAuthentication()
-  .then(collectEventData)
+return collectEventData()
   .then(sendCAPIRequest)
   .then(handleCAPIResponse);
 
@@ -1060,16 +924,6 @@ ___SERVER_PERMISSIONS___
     },
     "clientAnnotations": {
       "isEditedByUser": true
-    },
-    "isRequired": true
-  },
-  {
-    "instance": {
-      "key": {
-        "publicId": "access_template_storage",
-        "versionId": "1"
-      },
-      "param": []
     },
     "isRequired": true
   },
