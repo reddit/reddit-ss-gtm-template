@@ -484,7 +484,7 @@ const makeTableMap = require("makeTableMap");
 const parseUrl = require("parseUrl");
 const sendHttpRequest = require("sendHttpRequest");
 
-const TAG_VERSION = "v1.0";
+const TAG_VERSION = "v2.0";
 
 const AD_ACCOUNT_ID = encodeUriComponent(data.id);
 
@@ -1008,5 +1008,3 @@ ___NOTES___
 
 Created on 01/11/2023, 00:00:00
 Updated on 29/11/2023, 00:00:00
-
-
