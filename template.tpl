@@ -1,4 +1,4 @@
-﻿___TERMS_OF_SERVICE___
+___TERMS_OF_SERVICE___
 
 By creating or modifying this file you agree to Google Tag Manager's Community
 Template Gallery Developer Terms of Service available at
@@ -53,7 +53,8 @@ ___TEMPLATE_PARAMETERS___
     "simpleValueType": true,
     "name": "id",
     "type": "TEXT",
-    "valueHint": "t2_***** or a2_*****"
+    "valueHint": "t2_***** or a2_*****",
+    "notSetText": "Please provide your Reddit Ads Pixel ID."
   },
   {
     "macrosInSelect": false,
@@ -442,25 +443,26 @@ ___TEMPLATE_PARAMETERS___
       {
         "type": "TEXT",
         "name": "conversionToken",
-        "displayName": "Conversion Token",
+        "displayName": "Conversion Access Token",
         "simpleValueType": true,
         "valueValidators": [
           {
             "type": "NON_EMPTY"
           }
         ],
-        "notSetText": "Please generate a Conversion Token in your Reddit Ad account."
+        "notSetText": "Please provide a Conversion Access Token.",
+        "help": "You can learn more at \u003ca href\u003d\"https://business.reddithelp.com/helpcenter/s/article/conversion-access-token\"\u003ehttps://business.reddithelp.com/helpcenter/s/article/conversion-access-token\u003c/a\u003e"
       },
       {
         "type": "CHECKBOX",
         "name": "test",
         "checkboxText": "Test Mode",
         "simpleValueType": true,
-        "help": "Do not enable unless you are testing this tag.",
+        "help": "Enable this only while testing your tag configuration and setup. Disable in production!",
         "defaultValue": false
       }
     ],
-    "help": "Follow the Reddit API docs to obtain these values: https://ads-api.reddit.com/docs/v2/#section/Authentication"
+    "help": ""
   }
 ]
 
