@@ -520,12 +520,14 @@ const CONSTANTS = {
 
 const DEFAULT_EVENT_TIME = getTimestampMillis();
 
+const TEST_MODE = data.test;
 
 function collectEventData() {
     return Promise.create((resolve) => {
         const eventData = getAllEventData();
+    const config = data;
 
-        if (data.test) {
+    if (TEST_MODE) {
             logToConsole("data", data);
             logToConsole("eventData", eventData);
         }
@@ -535,7 +537,7 @@ function collectEventData() {
 
         const clickId = getClickId(eventData);
 
-        const eventMetadata = getEventMetadata();
+    const eventMetadata = getEventMetadata(config);
 
         const userData = getUserData(eventData);
 
@@ -546,7 +548,7 @@ function collectEventData() {
             event_metadata: eventMetadata,
             user: userData,
         };
-        if (data.test) {
+    if (TEST_MODE) {
             logToConsole("mappedEventData", mappedEventData);
         }
 
@@ -602,7 +604,7 @@ function getClickIdFromURL(pageUrl) {
     return;
   }
 
-  if (data.test) {
+  if (TEST_MODE) {
     logToConsole("url-cid", clickId);
   }
 
@@ -611,7 +613,7 @@ function getClickIdFromURL(pageUrl) {
 
 function getClickIdFromEvent(eventData) {
   const clickId = eventData[CONSTANTS.CLICK_ID_EVENT_NAME];
-  if (data.test) {
+  if (TEST_MODE) {
     logToConsole("event-cid", clickId);
   }
 
@@ -622,7 +624,7 @@ function getClickIdFromEvent(eventData) {
 
 function getClickIdFromCookie() {
   const clickIds = getCookieValues(CONSTANTS.CLICK_ID_COOKIE_NAME);
-  if (data.test) {
+  if (TEST_MODE) {
     logToConsole("cookie-cid", clickIds);
   }
 
@@ -640,30 +642,30 @@ function getClickIdFromCookie() {
   }
 }
 
-function getEventMetadata() {
+function getEventMetadata(config) {
   let eventMetadata = {};
 
-  if (data.conversionId) {
-    eventMetadata.conversion_id = makeString(data.conversionId);
+  if (config.conversionId) {
+    eventMetadata.conversion_id = makeString(config.conversionId);
   }
 
-  if (data.itemCount) {
-    eventMetadata.item_count = makeInteger(data.itemCount);
+  if (config.itemCount) {
+    eventMetadata.item_count = makeInteger(config.itemCount);
   }
 
-  if (data.transactionValue) {
-    eventMetadata.value_decimal = makeNumber(data.transactionValue);
+  if (config.transactionValue) {
+    eventMetadata.value_decimal = makeNumber(config.transactionValue);
   }
 
-  if (data.currency) {
-    eventMetadata.currency = makeString(data.currency);
+  if (config.currency) {
+    eventMetadata.currency = makeString(config.currency);
   }
 
   let products;
-  if (data.productInputType === "entryManual") {
-    products = data.productsRows;
-  } else if (data.productInputType === "entryJSON") {
-    products = JSON.parse(data.productsJSON);
+  if (config.productInputType === "entryManual") {
+    products = config.productsRows;
+  } else if (config.productInputType === "entryJSON") {
+    products = JSON.parse(config.productsJSON);
 
     if (!products) {
       logToConsole("Products JSON payload is malformed.");
@@ -680,7 +682,7 @@ function getEventMetadata() {
 
 function getUUIDFromCookie() {
   const uuids = getCookieValues(CONSTANTS.UUID_COOKIE_NAME);
-  if (data.test) {
+  if (TEST_MODE) {
     logToConsole("cookie-uuids", uuids);
   }
 
@@ -704,7 +706,7 @@ function getUUIDFromCookie() {
   }
 
   if (oldestUUID) {
-    if (data.test) {
+    if (TEST_MODE) {
       logToConsole("cookie-uuid-oldest", oldestUUID);
     }
     return makeString(oldestUUID);
@@ -713,7 +715,7 @@ function getUUIDFromCookie() {
 
 function getUUIDFromEvent(eventData) {
   const uuid = eventData[CONSTANTS.UUID_EVENT_NAME];
-  if (data.test) {
+  if (TEST_MODE) {
     logToConsole("event-uuid", uuid);
   }
 
@@ -722,10 +724,9 @@ function getUUIDFromEvent(eventData) {
   }
 }
 
-
 function getEmailFromCookie() {
   const emails = getCookieValues(CONSTANTS.EMAIL_COOKIE_NAME);
-  if (data.test) {
+  if (TEST_MODE) {
     logToConsole("cookie-email", emails);
   }
 
@@ -829,7 +830,7 @@ function sendCAPIRequest(eventData) {
 
   const body = JSON.stringify({
     events: [eventData],
-    test_mode: data.test,
+    test_mode: TEST_MODE,
     partner: CONSTANTS.CAPI_PARTNER,
   });
 
@@ -849,7 +850,7 @@ function handleCAPIResponse(response) {
   const body = JSON.parse(response.body);
 
   if (statusCode >= 200 && statusCode < 300) {
-    if (data.test) {
+    if (TEST_MODE) {
       logToConsole(
         "Conversion API request succeeded with message:",
         body.message
@@ -863,9 +864,7 @@ function handleCAPIResponse(response) {
   }
 }
 
-return collectEventData()
-  .then(sendCAPIRequest)
-  .then(handleCAPIResponse);
+return collectEventData().then(sendCAPIRequest).then(handleCAPIResponse);
 
 
 ___SERVER_PERMISSIONS___
