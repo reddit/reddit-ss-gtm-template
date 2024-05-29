@@ -912,10 +912,6 @@ ___SERVER_PERMISSIONS___
             "listItem": [
               {
                 "type": 1,
-                "string": "https://www.reddit.com/api/*"
-              },
-              {
-                "type": 1,
                 "string": "https://ads-api.reddit.com/api/*"
               }
             ]
@@ -1013,5 +1009,3 @@ ___NOTES___
 
 Created on 01/11/2023, 00:00:00
 Updated on 29/11/2023, 00:00:00
-
-
