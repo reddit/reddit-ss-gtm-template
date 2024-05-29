@@ -1,4 +1,4 @@
-___TERMS_OF_SERVICE___
+﻿___TERMS_OF_SERVICE___
 
 By creating or modifying this file you agree to Google Tag Manager's Community
 Template Gallery Developer Terms of Service available at
@@ -451,7 +451,7 @@ ___TEMPLATE_PARAMETERS___
           }
         ],
         "notSetText": "Please provide a Conversion Access Token.",
-        "help": "You can learn more at \u003ca href\u003d\"https://business.reddithelp.com/helpcenter/s/article/conversion-access-token\"\u003ehttps://business.reddithelp.com/helpcenter/s/article/conversion-access-token\u003c/a\u003e"
+        "help": "Generate this in your Reddit Ads account - \u003ca href\u003d\"https://business.reddithelp.com/helpcenter/s/article/conversion-access-token\"\u003ehttps://business.reddithelp.com/helpcenter/s/article/conversion-access-token\u003c/a\u003e"
       },
       {
         "type": "CHECKBOX",
@@ -461,8 +461,7 @@ ___TEMPLATE_PARAMETERS___
         "help": "Enable this only while testing your tag configuration and setup. Disable in production!",
         "defaultValue": false
       }
-    ],
-    "help": ""
+    ]
   }
 ]
 
@@ -1009,3 +1008,5 @@ ___NOTES___
 
 Created on 01/11/2023, 00:00:00
 Updated on 29/11/2023, 00:00:00
+
+
