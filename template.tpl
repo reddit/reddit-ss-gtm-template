@@ -262,6 +262,10 @@ ___TEMPLATE_PARAMETERS___
                 "displayValue": "Email"
               },
               {
+                "value": "phone_number",
+                "displayValue": "Phone Number"
+              },
+              {
                 "value": "aaid",
                 "displayValue": "AAID"
               },
@@ -484,7 +488,7 @@ const makeTableMap = require("makeTableMap");
 const parseUrl = require("parseUrl");
 const sendHttpRequest = require("sendHttpRequest");
 
-const TAG_VERSION = "v2.0";
+const TAG_VERSION = "v2.1";
 
 const AD_ACCOUNT_ID = encodeUriComponent(data.id);
 
@@ -772,6 +776,9 @@ function getUserData(eventData) {
       }
       if (params.idfa) {
         user.idfa = makeString(params.idfa);
+      }
+      if (params.phone_number) {
+        user.phone_number = makeString(params.phone_number);
       }
     }
   }
