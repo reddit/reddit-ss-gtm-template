@@ -2,9 +2,11 @@ homepage: "https://www.redditinc.com/advertising"
 documentation: "https://reddit.my.site.com/helpcenter/s/article/Install-the-Reddit-Pixel-on-your-website#GTM"
 versions:
   # Latest Version
+  - sha: caf9c47270da2a357526ad8c862a0f971c43ad08
+    changeNotes: Add support for phone number parameter
+  # Older versions
   - sha: 0b9e6dcfdfec36232fb93005a9bc8467e00232c6
     changeNotes: Simplify authentication with Conversion Tokens
-  # Older versions
   - sha: b7f5f9a7794124efda17f60bf221cf4d5014d2ef
     changeNotes: Support latest changes
   - sha: c9359848c48e5ae3cf62ab8bb72c8bbd0047c85a
