@@ -656,7 +656,7 @@ function getEventMetadata(config) {
     eventMetadata.item_count = makeInteger(config.itemCount);
   }
 
-  if (typeof config.transactionValue !== 'undefined') {
+  if (config.transactionValue || config.transactionValue === 0) {
     eventMetadata.value_decimal = makeNumber(config.transactionValue);
   }
 
