@@ -847,7 +847,7 @@ function sendCAPIRequest(eventData) {
     events: [eventData],
     partner: CONSTANTS.CAPI_PARTNER,
   };
-  if (TEST_ID && TEST_ID != "") {
+  if (TEST_ID) {
     body.test_id = TEST_ID;
   } else {
     body.test_mode = TEST_MODE;
