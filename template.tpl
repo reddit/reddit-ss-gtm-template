@@ -229,6 +229,22 @@ ___TEMPLATE_PARAMETERS___
   },
   {
     "type": "CHECKBOX",
+    "name": "test",
+    "checkboxText": "Test Mode",
+    "simpleValueType": true,
+    "help": "Enable this only while testing your tag configuration and setup. Disable in production! Events with this setting enabled are rate-limited to max 10 events per second.",
+    "defaultValue": false
+  },
+  {
+    "type": "TEXT",
+    "name": "testId",
+    "displayName": "Test ID",
+    "simpleValueType": true,
+    "optional": true,
+    "help": "Enable this only for use with \u003ca href\u003d\"https://ads.reddit.com/events-manager/testing\"\u003eEvent Testing\u003c/a\u003e". Disable in production! Events with this setting enabled are rate-limited to max 10 events per second."
+  },
+  {
+    "type": "CHECKBOX",
     "name": "enableFirstPartyCookies",
     "checkboxText": "Enable First Party Cookies",
     "simpleValueType": true,
@@ -456,14 +472,6 @@ ___TEMPLATE_PARAMETERS___
         ],
         "notSetText": "Please provide a Conversion Access Token.",
         "help": "Generate this in your Reddit Ads account - \u003ca href\u003d\"https://business.reddithelp.com/helpcenter/s/article/conversion-access-token\"\u003ehttps://business.reddithelp.com/helpcenter/s/article/conversion-access-token\u003c/a\u003e"
-      },
-      {
-        "type": "CHECKBOX",
-        "name": "test",
-        "checkboxText": "Test Mode",
-        "simpleValueType": true,
-        "help": "Enable this only while testing your tag configuration and setup. Disable in production!",
-        "defaultValue": false
       }
     ]
   }
@@ -524,6 +532,7 @@ const CONSTANTS = {
 const DEFAULT_EVENT_TIME = getTimestampMillis();
 
 const TEST_MODE = data.test;
+const TEST_ID = data.testId;
 
 function collectEventData() {
     return Promise.create((resolve) => {
@@ -834,11 +843,15 @@ function sendCAPIRequest(eventData) {
     Authorization: "Bearer " + CONVERSION_TOKEN,
   };
 
-  const body = JSON.stringify({
+  const body = {
     events: [eventData],
-    test_mode: TEST_MODE,
     partner: CONSTANTS.CAPI_PARTNER,
-  });
+  };
+  if (TEST_ID && TEST_ID != "") {
+    body.test_id = TEST_ID;
+  } else {
+    body.test_mode = TEST_MODE;
+  }
 
   return sendHttpRequest(
     url,
@@ -847,7 +860,7 @@ function sendCAPIRequest(eventData) {
       timeout: CONSTANTS.API_CONVERSIONS_ENDPOINT_TIMEOUT,
       headers: headers,
     },
-    body
+    JSON.stringify(body)
   );
 }
 
