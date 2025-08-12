@@ -2,7 +2,7 @@ homepage: "https://www.redditinc.com/advertising"
 documentation: "https://reddit.my.site.com/helpcenter/s/article/Install-the-Reddit-Pixel-on-your-website#GTM"
 versions:
   # Latest Version
-  - sha: f654d5ed8cf6fe74827975dd215b26853b31436a
+  - sha: b9eb9f63cb3e4eeac9b25a09e1edd23a0f9ad538
     changeNotes: Add test_id parameter for Event Testing support
   # Older Versions
   - sha: 0a92cabe2ee582326a115414d8a36c19315ac8c2
