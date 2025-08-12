@@ -232,7 +232,7 @@ ___TEMPLATE_PARAMETERS___
     "name": "test",
     "checkboxText": "Test Mode",
     "simpleValueType": true,
-    "help": "Enable this only while testing your tag configuration and setup. Disable in production! Events with this setting enabled are rate-limited to max 10 events per second.",
+    "help": "Enable this only while testing your tag configuration and setup. \u003cstrong\u003eDisable in production!\u003c/strong\u003e Events with this setting enabled are rate-limited to max 10 events per second.",
     "defaultValue": false
   },
   {
@@ -241,7 +241,7 @@ ___TEMPLATE_PARAMETERS___
     "displayName": "Test ID",
     "simpleValueType": true,
     "optional": true,
-    "help": "Enable this only for use with \u003ca href\u003d\"https://ads.reddit.com/events-manager/testing\"\u003eEvent Testing\u003c/a\u003e". Disable in production! Events with this setting enabled are rate-limited to max 10 events per second."
+    "help": "Enable this only for use with \u003ca href\u003d\"https://ads.reddit.com/events-manager/testing\"\u003eEvent Testing\u003c/a\u003e. \u003cstrong\u003eDisable in production!\u003c/strong\u003e Events with this setting enabled are rate-limited to max 10 events per second."
   },
   {
     "type": "CHECKBOX",
