@@ -908,7 +908,6 @@ function getUserData(eventData) {
         user.aaid = makeString(params.aaid);
       }
       if (params.email) {
-        // TODO: ask about getEmailFromCookie, this will never run if advancedMataching is not enabled
         user.email = makeString(params.email) || getEmailFromCookie();
       }
       if (params.externalId) {
