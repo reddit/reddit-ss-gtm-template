@@ -11,8 +11,7 @@ ___INFO___
 {
   "displayName": "Reddit Conversions API",
   "description": "By using the Reddit Conversions API you agree to comply with and to be bound by the Reddit Advertiser Measurement Program Terms\n\nhttps://www.reddithelp.com/en/categories/advertising/policy-guideline",
-  "securityGroups": [],
-  "id": "cvt_temp_public_id",
+  "id": "cvt_M6PJS",
   "type": "TAG",
   "version": 1,
   "brand": {
@@ -22,7 +21,8 @@ ___INFO___
   },
   "containerContexts": [
     "SERVER"
-  ]
+  ],
+  "securityGroups": []
 }
 
 
@@ -57,7 +57,7 @@ ___TEMPLATE_PARAMETERS___
     "notSetText": "Please provide your Reddit Ads Pixel ID."
   },
   {
-    "macrosInSelect": false,
+    "macrosInSelect": true,
     "selectItems": [
       {
         "displayValue": "Page Visit",
@@ -496,6 +496,8 @@ const makeTableMap = require("makeTableMap");
 const parseUrl = require("parseUrl");
 const sendHttpRequest = require("sendHttpRequest");
 
+const TEMPLATE_VERSION = "1.0.0";
+
 const TAG_VERSION = "v2.1";
 
 const AD_ACCOUNT_ID = encodeUriComponent(data.id);
@@ -535,37 +537,43 @@ const TEST_MODE = data.test;
 const TEST_ID = data.testId;
 
 function collectEventData() {
-    return Promise.create((resolve) => {
-        const eventData = getAllEventData();
+  return Promise.create((resolve) => {
+    const eventData = getAllEventData();
     const config = data;
 
+    const integrationPartner =
+      eventData.integration_partner || CONSTANTS.CAPI_PARTNER;
+
     if (TEST_MODE) {
-            logToConsole("data", data);
-            logToConsole("eventData", eventData);
-        }
+      logToConsole("data", data);
+      logToConsole("eventData", eventData);
+    }
 
-        const eventAtMs = DEFAULT_EVENT_TIME;
-        const eventType = getEventType();
+    const eventAtMs = DEFAULT_EVENT_TIME;
+    const eventType = getEventType();
 
-        const clickId = getClickId(eventData);
+    const clickId = getClickId(eventData);
 
-    const eventMetadata = getEventMetadata(config);
+    const eventMetadata = getEventMetadata(config, eventData);
 
-        const userData = getUserData(eventData);
+    const userData = getUserData(eventData);
 
-        const mappedEventData = {
-            event_at_ms: eventAtMs,
-            event_type: eventType,
-            click_id: clickId,
-            event_metadata: eventMetadata,
-            user: userData,
-        };
+    const mappedEventData = {
+      event_at_ms: eventAtMs,
+      event_type: eventType,
+      click_id: clickId,
+      event_metadata: eventMetadata,
+      user: userData,
+    };
     if (TEST_MODE) {
-            logToConsole("mappedEventData", mappedEventData);
-        }
+      logToConsole("mappedEventData", mappedEventData);
+    }
 
-        return resolve(mappedEventData);
+    return resolve({
+      eventPayload: mappedEventData,
+      partner: integrationPartner,
     });
+  });
 }
 
 function getEventType() {
@@ -654,39 +662,151 @@ function getClickIdFromCookie() {
   }
 }
 
-function getEventMetadata(config) {
+var formatCategories = function (item) {
+  var categories = [];
+  var categoryLevels = [
+    "item_category",
+    "item_category2",
+    "item_category3",
+    "item_category4",
+    "item_category5",
+  ];
+
+  for (var i = 0; i < categoryLevels.length; i++) {
+    var key = categoryLevels[i];
+    if (item[key]) {
+      var value = item[key].trim();
+      if (value !== "") {
+        categories.push(value);
+      }
+    }
+  }
+
+  return categories.length > 0 ? categories.join(" > ") : null;
+};
+
+function processEcommerceItems(items) {
+  if (!items || items.length === 0) {
+    return {
+      products: null,
+      itemCount: 0,
+    };
+  }
+
+  let processedItems = [];
+  let processedItemCount = 0;
+
+  for (const item of items) {
+    if (!item) return;
+
+    let product = {};
+    if (item.item_id) product.id = makeString(item.item_id);
+    if (item.item_name) product.name = makeString(item.item_name);
+    let itemCategory = formatCategories(item);
+    if (itemCategory) product.category = makeString(itemCategory);
+
+    processedItems.push(product);
+    let itemQuantity =
+      item.quantity !== undefined && item.quantity !== null ? makeInteger(item.quantity) : 1;
+    processedItemCount += itemQuantity;
+  }
+
+  return {
+    products: processedItems,
+    itemCount: processedItemCount,
+  };
+}
+
+function processProductData(config, eventData) {
+  let finalProducts;
+  let finalItemCount;
+
+  // Determine the item count with priority: UI > Web Manual
+  finalItemCount = config.itemCount || eventData.item_count;
+
+  // Prioritize manually configured products from config (UI)
+  if (
+    config.productInputType === "entryManual" &&
+    config.productsRows &&
+    config.productsRows.length > 0
+  ) {
+    finalProducts = config.productsRows;
+  } else if (config.productInputType === "entryJSON" && config.productsJSON) {
+    finalProducts = JSON.parse(config.productsJSON);
+    if (!finalProducts) {
+      logToConsole("Products JSON payload is malformed.");
+      return null;
+    }
+  } else if (eventData.ecommerce_items) {
+    // Fallback to handle ecommerce items from web container
+    const ecommerceItems = JSON.parse(eventData.ecommerce_items);
+    const ecommerceResult = processEcommerceItems(ecommerceItems);
+    finalProducts = ecommerceResult.products;
+    finalItemCount = ecommerceResult.itemCount;
+  } else if (eventData.product_data) {
+    // Fallback to handle raw product data from web container
+    if (getType(eventData.product_data) === "string") {
+      finalProducts = JSON.parse(eventData.product_data);
+      if (!finalProducts) {
+        logToConsole(
+          "Product data JSON payload is malformed. Products will be omitted."
+        );
+        finalProducts = null;
+      }
+    } else if (getType(eventData.product_data) === "array") {
+      finalProducts = eventData.product_data;
+    } else {
+      logToConsole(
+        "Product data is not in expected format. Products will be omitted."
+      );
+      finalProducts = null;
+    }
+  }
+
+  return {
+    products: finalProducts,
+    itemCount: finalItemCount,
+  };
+}
+
+function getEventMetadata(config, eventData) {
   let eventMetadata = {};
 
   if (config.conversionId) {
     eventMetadata.conversion_id = makeString(config.conversionId);
   }
 
-  if (config.itemCount) {
-    eventMetadata.item_count = makeInteger(config.itemCount);
+  let transactionValue;
+  if (
+    config.transactionValue !== undefined &&
+    config.transactionValue !== null
+  ) {
+    transactionValue = config.transactionValue;
+  } else if (eventData.value !== undefined && eventData.value !== null) {
+    transactionValue = eventData.value;
   }
 
-  if (config.transactionValue || config.transactionValue === 0) {
-    eventMetadata.value_decimal = makeNumber(config.transactionValue);
+  if (transactionValue !== undefined && transactionValue !== null) {
+    eventMetadata.value_decimal = makeNumber(transactionValue);
   }
 
-  if (config.currency) {
-    eventMetadata.currency = makeString(config.currency);
+  const currency = config.currency || eventData.currency;
+  if (currency) {
+    eventMetadata.currency = makeString(currency);
   }
 
-  let products;
-  if (config.productInputType === "entryManual") {
-    products = config.productsRows;
-  } else if (config.productInputType === "entryJSON") {
-    products = JSON.parse(config.productsJSON);
+  const productData = processProductData(config, eventData);
 
-    if (!products) {
-      logToConsole("Products JSON payload is malformed.");
-      return data.gtmOnFailure();
-    }
+  if (productData === null) {
+    return data.gtmOnFailure();
   }
 
-  if (products && products.length > 0) {
-    eventMetadata.products = products;
+  if (productData.products && productData.products.length > 0) {
+    eventMetadata.products = productData.products;
+  }
+
+  if (productData.itemCount !== undefined && productData.itemCount !== null) {
+    eventMetadata.item_count = makeInteger(productData.itemCount);
   }
 
   return eventMetadata;
@@ -766,6 +886,16 @@ function getUserData(eventData) {
     }
   }
 
+  user.email =
+    eventData.user_data &&
+    (makeString(eventData.user_data.email_address) ||
+      makeString(eventData.user_data.sha256_email_address));
+
+  user.phone_number =
+    eventData.user_data &&
+    (makeString(eventData.user_data.phone_number) ||
+      makeString(eventData.user_data.sha256_phone_number));
+
   if (
     data.advancedMatching &&
     data.advancedMatchingParams &&
@@ -833,7 +963,9 @@ function getUserData(eventData) {
   return user;
 }
 
-function sendCAPIRequest(eventData) {
+function sendCAPIRequest(requestData) {
+  const eventPayload = requestData.eventPayload;
+  const integrationPartner = requestData.partner;
   // Append advertiser ID to URL path
   const url = CONSTANTS.API_CONVERSIONS_ENDPOINT + AD_ACCOUNT_ID;
 
@@ -844,9 +976,11 @@ function sendCAPIRequest(eventData) {
   };
 
   const body = {
-    events: [eventData],
-    partner: CONSTANTS.CAPI_PARTNER,
+    events: [eventPayload],
+    partner: integrationPartner,
+    partner_version: TEMPLATE_VERSION,
   };
+
   if (TEST_ID) {
     body.test_id = TEST_ID;
   } else {
@@ -875,6 +1009,7 @@ function handleCAPIResponse(response) {
         body.message
       );
     }
+
     return data.gtmOnSuccess();
   } else {
     logToConsole("Conversion API request failed with status code:", statusCode);
