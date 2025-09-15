@@ -1163,8 +1163,391 @@ ___SERVER_PERMISSIONS___
 
 ___TESTS___
 
-scenarios: []
-setup: ''
+scenarios:
+- name: Verify default populated event_at and partner info
+  code: "const testData = {};\n\nverifyCAPI((requestUrl, requestOptions, requestBody)\
+    \ => {\n  assertThat(JSON.parse(requestBody).data.events[0].event_at).isDefined();\n\
+    \  assertThat(JSON.parse(requestBody).data.partner).isEqualTo('SGTM');\n  assertThat(JSON.parse(requestBody).data.partner_version).isEqualTo('2.0.0');\n\
+    \  \n});\n\nrunCode(testData);"
+- name: When CAPI returns 200, gtmOnSuccess
+  code: |-
+    const testData = {};
+
+    mock('sendHttpRequest', (requestUrl, requestOptions, requestBody) => {
+      return Promise.create((resolve, reject) => {
+        resolve({ statusCode: 200, body: JSON.stringify(mockSuccessResponse)});
+      });
+    });
+
+    runCode(testData);
+
+    callLater(() => {
+      assertApi('gtmOnSuccess').wasCalled();
+      assertApi('gtmOnFailure').wasNotCalled();
+    });
+- name: When CAPI returns 400, gtmOnFailure
+  code: |-
+    const testData = {};
+
+    const mockErrorResponse = {
+      "error": {
+        "code": 401,
+        "message": "No bearer token provided."
+      }
+    };
+
+    mock('sendHttpRequest', (requestUrl, requestOptions, requestBody) => {
+      return Promise.create((resolve, reject) => {
+        resolve({ statusCode: 400, body: JSON.stringify(mockErrorResponse)});
+      });
+    });
+
+    runCode(testData);
+
+    callLater(() => {
+      assertApi('gtmOnSuccess').wasNotCalled();
+      assertApi('gtmOnFailure').wasCalled();
+    });
+- name: Given pixel ID, verify endpoint path
+  code: "const testData = {\n  id: 't2_123',\n};\n\nconst expectedUrl = 'https://ads-api.reddit.com/api/v3/pixels/'\
+    \ + testData.id + '/conversion_events';\n\nverifyCAPI((requestUrl, requestOptions,\
+    \ requestBody) => {\n  assertThat(requestUrl).isEqualTo(expectedUrl);\n  \n});\n\
+    \nrunCode(testData);"
+- name: Given standard eventType, verify tracking_type
+  code: |-
+    const testData = {
+      eventType: 'PageVisit',
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].type.tracking_type).isEqualTo('PAGE_VISIT');
+      assertThat(JSON.parse(requestBody).data.events[0].type.custom_event_name).isUndefined();
+    });
+
+    runCode(testData);
+- name: Given custom eventType, verify custom_event_name
+  code: |-
+    const testData = {
+      eventType: 'Custom',
+      customEventName: 'test_custom_event',
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].type.tracking_type).isEqualTo('CUSTOM');
+      assertThat(JSON.parse(requestBody).data.events[0].type.custom_event_name).isEqualTo('test_custom_event');
+    });
+
+    runCode(testData);
+- name: Given only event currency, verify currency in metadata
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        currency: 'USD',
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.currency).isEqualTo('USD');
+    });
+
+    runCode(testData);
+- name: Given both tag and event currency, verify tag definition overrides event
+  code: |-
+    const testData = {
+      currency: 'USD',
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        currency: 'CAD',
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.currency).isEqualTo('USD');
+    });
+
+    runCode(testData);
+- name: Given only event value, verify value in metadata
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        value: 10.99,
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.value).isEqualTo(10.99);
+    });
+
+    runCode(testData);
+- name: Given both tag trasactionValue and event value, verify tag definition overrides
+    event
+  code: |-
+    const testData = {
+      transactionValue: 10.99,
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        value: 1.99,
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.value).isEqualTo(10.99);
+    });
+
+    runCode(testData);
+- name: Given only event item_count, verify item_count in metadata
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        item_count: 2
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.item_count).isEqualTo(2);
+    });
+
+    runCode(testData);
+- name: Given both tag itemCount and event item_count, verify tag defeinition overrides
+    event
+  code: |-
+    const testData = {
+      itemCount: 2
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        item_count: 1
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.item_count).isEqualTo(2);
+    });
+
+    runCode(testData);
+- name: Given event UUID, verify user
+  code: |-
+    const testData = {
+      enableFirstPartyCookies: true,
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        rdt_uuid: "test_uuid"
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.uuid).isEqualTo('test_uuid');
+    });
+
+    runCode(testData);
+- name: Given both cookie and event UUID, verify cookie oldest UUID overrides event
+  code: |-
+    const testData = {
+      enableFirstPartyCookies: true,
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        rdt_uuid: "dummy_uuid"
+      };
+    });
+
+    mock('getCookieValues', (key) => {
+      if (key == "_rdt_uuid") {
+        return [
+          '2.new_uuid',
+          '1.oldest_uuid',
+        ];
+      }
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.uuid).isEqualTo('oldest_uuid');
+    });
+
+    runCode(testData);
+- name: Given event email and phone number, verify user has both
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        user_data: {
+          email_address: "dummy@example.com",
+          phone_number: "+11234567890",
+        }
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.email).isEqualTo('dummy@example.com');
+      assertThat(JSON.parse(requestBody).data.events[0].user.phone_number).isEqualTo('+11234567890');
+    });
+
+    runCode(testData);
+- name: Given both tag and event user data, verify tag params override event
+  code: |-
+    const testData = {
+      advancedMatching: true,
+      advancedMatchingParams: [
+        {
+          name: "email",
+          value: "dummy@example.com",
+        },
+        {
+          name: "phone_number",
+          value: "+11234567890",
+        }
+      ]
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        user_data: {
+          email_address: "dummy@test.com",
+          phone_number: "+10987654321",
+        }
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.email).isEqualTo('dummy@example.com');
+      assertThat(JSON.parse(requestBody).data.events[0].user.phone_number).isEqualTo('+11234567890');
+    });
+
+    runCode(testData);
+- name: Given advanced matching IDs, verify user has all IDs
+  code: |-
+    const testData = {
+      advancedMatching: true,
+      advancedMatchingParams: [
+        {
+          name: "aaid",
+          value: "test_aaid",
+        },
+        {
+          name: "externalId",
+          value: "test_external_id",
+        },
+        {
+          name: "idfa",
+          value: "test_idfa",
+        }
+      ]
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.aaid).isEqualTo('test_aaid');
+      assertThat(JSON.parse(requestBody).data.events[0].user.external_id).isEqualTo('test_external_id');
+      assertThat(JSON.parse(requestBody).data.events[0].user.idfa).isEqualTo('test_idfa');
+    });
+
+    runCode(testData);
+- name: Given data processing options, verify user has data processing options
+  code: |-
+    const testData = {
+      dataProcessingOptions: true,
+      limitedDataUsageOptions: true,
+      ldu_country: "US",
+      ldu_region: "US-CA",
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.data_processing_options.modes[0]).isEqualTo('LDU');
+      assertThat(JSON.parse(requestBody).data.events[0].user.data_processing_options.country).isEqualTo('US');
+      assertThat(JSON.parse(requestBody).data.events[0].user.data_processing_options.region).isEqualTo('US-CA');
+    });
+
+    runCode(testData);
+- name: Given event ip_override, verify user has ip_address
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        ip_override: "123.456.78.90",
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.ip_address).isEqualTo('123.456.78.90');
+    });
+
+    runCode(testData);
+- name: Given event user_agent, verify user has user_agent
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        user_agent: "test_user_agent",
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.user_agent).isEqualTo('test_user_agent');
+    });
+
+    runCode(testData);
+- name: Given event screen_resolution, verify user has screen_dimensions
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        screen_resolution: "1920x1080",
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.screen_dimensions.width).isEqualTo(1920);
+      assertThat(JSON.parse(requestBody).data.events[0].user.screen_dimensions.height).isEqualTo(1080);
+    });
+
+    runCode(testData);
+- name: Given conversion access token, verify request header has bearer token
+  code: |-
+    const testData = {
+      conversionToken: "test_capi_token"
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(requestOptions.headers.Authorization).isEqualTo('Bearer ' + testData.conversionToken);
+    });
+
+    runCode(testData);
+setup: |-
+  const JSON = require('JSON');
+  const Promise = require('Promise');
+  const callLater = require('callLater');
+
+  const mockSuccessResponse = {
+    "data": {
+      "message": "Successfully processed 1 conversion events."
+    }
+  };
+
+  function verifyCAPI(verify) {
+    return mock('sendHttpRequest', (requestUrl, requestOptions, requestBody) => {
+      verify(requestUrl, requestOptions, requestBody);
+      return Promise.create((resolve, reject) => {
+        resolve({ statusCode: 200, body: JSON.stringify(mockSuccessResponse)});
+      });
+    });
+  }
 
 
 ___NOTES___
