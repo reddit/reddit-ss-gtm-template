@@ -772,8 +772,9 @@ function processProductData(config, eventData) {
 function getEventMetadata(config, eventData) {
   let eventMetadata = {};
 
-  if (config.conversionId) {
-    eventMetadata.conversion_id = makeString(config.conversionId);
+  const conversionId = config.conversionId || eventData.conversion_id;
+  if (conversionId) {
+    eventMetadata.conversion_id = makeString(conversionId);
   }
 
   let transactionValue;
