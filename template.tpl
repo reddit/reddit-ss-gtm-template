@@ -552,7 +552,7 @@ function collectEventData() {
     }
 
     const eventAtMs = DEFAULT_EVENT_TIME;
-    const eventType = getEventType();
+    const eventType = getEventType(integrationPartner);
 
     const clickId = getClickId(eventData);
 
@@ -579,17 +579,11 @@ function collectEventData() {
   });
 }
 
-function getEventType() {
-  if (data.eventType === "Custom") {
-    return {
-      tracking_type: mapTrackingType(data.eventType),
-      custom_event_name: data.customEventName,
-    };
-  } else {
-    return {
-      tracking_type: mapTrackingType(data.eventType),
-    };
-  }
+function getEventType(integrationPartner) {
+  return {
+    tracking_type: integrationPartner === CONSTANTS.CAPI_PARTNER ? mapTrackingType(data.eventType) : data.eventType,
+    custom_event_name: data.eventType === "Custom" ? data.customEventName : undefined,
+  };
 }
 
 function mapTrackingType(name) {
@@ -1238,6 +1232,88 @@ scenarios:
     });
 
     runCode(testData);
+- name: Given AUTOMATIC_GTM partner, verify tracking type not overriden
+  code: |-
+    const testData = {
+      eventType: 'add_to_cart',
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        integration_partner: "AUTOMATIC_GTM"
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].type.tracking_type).isEqualTo('add_to_cart');
+      assertThat(JSON.parse(requestBody).data.events[0].type.custom_event_name).isUndefined();
+    });
+
+    runCode(testData);
+- name: Given event click ID, verify click_id
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        rdt_cid: 'test_click_id',
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].click_id).isEqualTo('test_click_id');
+    });
+
+    runCode(testData);
+- name: Given event and cookie click ID, verify cookie overrides event
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        rdt_cid: 'test_click_id',
+      };
+    });
+
+    mock('getCookieValues', (key) => {
+      if (key == "_rdt_cid") {
+        return [
+          'click_id_1',
+          'click_id_2',
+        ];
+      }
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].click_id).isEqualTo('click_id_1');
+    });
+
+    runCode(testData);
+- name: Given event, cookie and URL click ID, verify URL overrides all
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        rdt_cid: 'test_click_id',
+        page_location: "https://sample.com/?rdt_cid=url_click_id"
+      };
+    });
+
+    mock('getCookieValues', (key) => {
+      if (key == "_rdt_cid") {
+        return [
+          'click_id_1',
+          'click_id_2',
+        ];
+      }
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].click_id).isEqualTo('url_click_id');
+    });
+
+    runCode(testData);
 - name: Given only event currency, verify currency in metadata
   code: |-
     const testData = {};
@@ -1333,6 +1409,235 @@ scenarios:
 
     verifyCAPI(function(requestUrl, requestOptions, requestBody) {
       assertThat(JSON.parse(requestBody).data.events[0].metadata.item_count).isEqualTo(2);
+    });
+
+    runCode(testData);
+- name: Given event ecommerce_items, verify products override event item_count
+  code: |-
+    const testData = {};
+
+    const items = [
+      {
+        item_id: '1',
+        item_name: 'product_a',
+        item_category: 'a1',
+        item_category2: 'a2',
+        item_category3: 'a3',
+        item_category4: 'a4',
+        item_category5: 'a5'
+      },
+      {
+        item_id: '2',
+        item_name: 'product_b',
+        item_category: 'b1',
+        item_category2: 'b2'
+      }
+    ];
+
+    mock('getAllEventData', () => {
+      return {
+        item_count: 1,
+        ecommerce_items: JSON.stringify(items)
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.item_count).isEqualTo(2);
+    });
+
+    runCode(testData);
+- name: Given event ecommerce_items, verify products override tag itemCount
+  code: |-
+    const testData = {
+      itemCount: 1
+    };
+
+    const items = [
+      {
+        item_id: '1',
+        item_name: 'product_a',
+        item_category: 'a1',
+        item_category2: 'a2',
+        item_category3: 'a3',
+        item_category4: 'a4',
+        item_category5: 'a5'
+      },
+      {
+        item_id: '2',
+        item_name: 'product_b',
+        item_category: 'b1',
+        item_category2: 'b2'
+      }
+    ];
+
+    mock('getAllEventData', () => {
+      return {
+        ecommerce_items: JSON.stringify(items)
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.item_count).isEqualTo(2);
+    });
+
+    runCode(testData);
+- name: Given tag productsRows, verify metadata products
+  code: |-
+    const testData = {
+      productInputType: 'entryManual',
+      productsRows: [
+        {
+          id: '1',
+          name: 'product_a',
+          category: 'a1 > a2 > a3 > a4 > a5'
+        },
+        {
+          id: '2',
+          name: 'product_b',
+          category: 'b1 > b2'
+        }
+      ]
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].id).isEqualTo('1');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].name).isEqualTo('product_a');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].category).isEqualTo('a1 > a2 > a3 > a4 > a5');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].id).isEqualTo('2');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].name).isEqualTo('product_b');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].category).isEqualTo('b1 > b2');
+    });
+
+    runCode(testData);
+- name: Given tag productsJSON, verify metadata products
+  code: |-
+    const products = [
+      {
+        id: '1',
+        name: 'product_a',
+        category: 'a1 > a2 > a3 > a4 > a5'
+      },
+      {
+        id: '2',
+        name: 'product_b',
+        category: 'b1 > b2'
+      }
+    ];
+
+    const testData = {
+      productInputType: 'entryJSON',
+      productsJSON: JSON.stringify(products)
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].id).isEqualTo('1');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].name).isEqualTo('product_a');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].category).isEqualTo('a1 > a2 > a3 > a4 > a5');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].id).isEqualTo('2');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].name).isEqualTo('product_b');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].category).isEqualTo('b1 > b2');
+    });
+
+    runCode(testData);
+- name: Given event ecommerce_items, verify metadata products
+  code: |-
+    const testData = {};
+
+    const items = [
+      {
+        item_id: '1',
+        item_name: 'product_a',
+        item_category: 'a1',
+        item_category2: 'a2',
+        item_category3: 'a3',
+        item_category4: 'a4',
+        item_category5: 'a5'
+      },
+      {
+        item_id: '2',
+        item_name: 'product_b',
+        item_category: 'b1',
+        item_category2: 'b2'
+      }
+    ];
+
+    mock('getAllEventData', () => {
+      return {
+        ecommerce_items: JSON.stringify(items)
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].id).isEqualTo('1');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].name).isEqualTo('product_a');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].category).isEqualTo('a1 > a2 > a3 > a4 > a5');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].id).isEqualTo('2');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].name).isEqualTo('product_b');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].category).isEqualTo('b1 > b2');
+    });
+
+    runCode(testData);
+- name: Given event product_data string, verify metadata products
+  code: |-
+    const products = [
+      {
+        id: '1',
+        name: 'product_a',
+        category: 'a1 > a2 > a3 > a4 > a5'
+      },
+      {
+        id: '2',
+        name: 'product_b',
+        category: 'b1 > b2'
+      }
+    ];
+
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        product_data: JSON.stringify(products)
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].id).isEqualTo('1');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].name).isEqualTo('product_a');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].category).isEqualTo('a1 > a2 > a3 > a4 > a5');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].id).isEqualTo('2');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].name).isEqualTo('product_b');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].category).isEqualTo('b1 > b2');
+    });
+
+    runCode(testData);
+- name: Given event product_data array, verify metadata products
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        product_data: [
+          {
+            id: '1',
+            name: 'product_a',
+            category: 'a1 > a2 > a3 > a4 > a5'
+          },
+          {
+            id: '2',
+            name: 'product_b',
+            category: 'b1 > b2'
+          }
+        ]
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].id).isEqualTo('1');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].name).isEqualTo('product_a');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].category).isEqualTo('a1 > a2 > a3 > a4 > a5');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].id).isEqualTo('2');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].name).isEqualTo('product_b');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].category).isEqualTo('b1 > b2');
     });
 
     runCode(testData);
