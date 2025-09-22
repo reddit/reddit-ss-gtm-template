@@ -228,14 +228,6 @@ ___TEMPLATE_PARAMETERS___
     "help": "Unique Conversion ID that corresponds to a distinct conversion event. Conversion ID is used for deduplication and prevents the same conversion event from being processed more than once if it is sent multiple times."
   },
   {
-    "type": "CHECKBOX",
-    "name": "test",
-    "checkboxText": "Test Mode",
-    "simpleValueType": true,
-    "help": "Enable this only while testing your tag configuration and setup. \u003cstrong\u003eDisable in production!\u003c/strong\u003e Events with this setting enabled are rate-limited to max 10 events per second.",
-    "defaultValue": false
-  },
-  {
     "type": "TEXT",
     "name": "testId",
     "displayName": "Test ID",
@@ -496,11 +488,11 @@ const makeTableMap = require("makeTableMap");
 const parseUrl = require("parseUrl");
 const sendHttpRequest = require("sendHttpRequest");
 
-const TEMPLATE_VERSION = "1.0.0";
+const TEMPLATE_VERSION = "2.0.0";
 
 const TAG_VERSION = "v2.1";
 
-const AD_ACCOUNT_ID = encodeUriComponent(data.id);
+const PIXEL_ID = encodeUriComponent(data.id);
 
 const CONVERSION_TOKEN = data.conversionToken;
 
@@ -513,12 +505,11 @@ const CONSTANTS = {
   ACCESS_TOKEN_EXPIRY_THRESHOLD_MILLIS: 60 * MILLIS_IN_SECONDS,
 
   API_USER_AGENT:
-    "SGTM:" + containerId + ":" + TAG_VERSION + " (by " + AD_ACCOUNT_ID + ")",
+    "SGTM:" + containerId + ":" + TAG_VERSION + " (by " + PIXEL_ID + ")",
 
   CAPI_PARTNER: "SGTM",
 
-  API_CONVERSIONS_ENDPOINT:
-    "https://ads-api.reddit.com/api/v2.0/conversions/events/",
+  API_CONVERSIONS_ENDPOINT: "https://ads-api.reddit.com/api/v3/pixels/" + PIXEL_ID + "/conversion_events",
   API_CONVERSIONS_ENDPOINT_TIMEOUT: 3 * MILLIS_IN_SECONDS,
 
   CLICK_ID_COOKIE_NAME: "_rdt_cid",
@@ -529,11 +520,22 @@ const CONSTANTS = {
 
   UUID_COOKIE_NAME: "_rdt_uuid",
   UUID_EVENT_NAME: "rdt_uuid",
+  
+  TRACKING_TYPE_MAPPING: {
+    "PageVisit": "PAGE_VISIT",
+    "ViewContent": "VIEW_CONTENT",
+    "Search": "SEARCH",
+    "AddToCart": "ADD_TO_CART",
+    "AddToWishlist": "ADD_TO_WISHLIST",
+    "Purchase": "PURCHASE",
+    "Lead": "LEAD",
+    "SignUp": "SIGN_UP",
+    "Custom": "CUSTOM"
+  }
 };
 
 const DEFAULT_EVENT_TIME = getTimestampMillis();
 
-const TEST_MODE = data.test;
 const TEST_ID = data.testId;
 
 function collectEventData() {
@@ -544,13 +546,13 @@ function collectEventData() {
     const integrationPartner =
       eventData.integration_partner || CONSTANTS.CAPI_PARTNER;
 
-    if (TEST_MODE) {
+    if (TEST_ID) {
       logToConsole("data", data);
       logToConsole("eventData", eventData);
     }
 
     const eventAtMs = DEFAULT_EVENT_TIME;
-    const eventType = getEventType();
+    const eventType = getEventType(integrationPartner);
 
     const clickId = getClickId(eventData);
 
@@ -559,13 +561,14 @@ function collectEventData() {
     const userData = getUserData(eventData);
 
     const mappedEventData = {
-      event_at_ms: eventAtMs,
-      event_type: eventType,
+      event_at: eventAtMs,
+      action_source: "WEBSITE",
+      type: eventType,
       click_id: clickId,
-      event_metadata: eventMetadata,
+      metadata: eventMetadata,
       user: userData,
     };
-    if (TEST_MODE) {
+    if (TEST_ID) {
       logToConsole("mappedEventData", mappedEventData);
     }
 
@@ -576,17 +579,15 @@ function collectEventData() {
   });
 }
 
-function getEventType() {
-  if (data.eventType === "Custom") {
-    return {
-      tracking_type: "Custom",
-      custom_event_name: data.customEventName,
-    };
-  } else {
-    return {
-      tracking_type: data.eventType,
-    };
-  }
+function getEventType(integrationPartner) {
+  return {
+    tracking_type: integrationPartner === CONSTANTS.CAPI_PARTNER ? mapTrackingType(data.eventType) : data.eventType,
+    custom_event_name: data.eventType === "Custom" ? data.customEventName : undefined,
+  };
+}
+
+function mapTrackingType(name) {
+  return CONSTANTS.TRACKING_TYPE_MAPPING[name];
 }
 
 function getClickId(eventData) {
@@ -624,7 +625,7 @@ function getClickIdFromURL(pageUrl) {
     return;
   }
 
-  if (TEST_MODE) {
+  if (TEST_ID) {
     logToConsole("url-cid", clickId);
   }
 
@@ -633,7 +634,7 @@ function getClickIdFromURL(pageUrl) {
 
 function getClickIdFromEvent(eventData) {
   const clickId = eventData[CONSTANTS.CLICK_ID_EVENT_NAME];
-  if (TEST_MODE) {
+  if (TEST_ID) {
     logToConsole("event-cid", clickId);
   }
 
@@ -644,7 +645,7 @@ function getClickIdFromEvent(eventData) {
 
 function getClickIdFromCookie() {
   const clickIds = getCookieValues(CONSTANTS.CLICK_ID_COOKIE_NAME);
-  if (TEST_MODE) {
+  if (TEST_ID) {
     logToConsole("cookie-cid", clickIds);
   }
 
@@ -788,7 +789,7 @@ function getEventMetadata(config, eventData) {
   }
 
   if (transactionValue !== undefined && transactionValue !== null) {
-    eventMetadata.value_decimal = makeNumber(transactionValue);
+    eventMetadata.value = makeNumber(transactionValue);
   }
 
   const currency = config.currency || eventData.currency;
@@ -815,7 +816,7 @@ function getEventMetadata(config, eventData) {
 
 function getUUIDFromCookie() {
   const uuids = getCookieValues(CONSTANTS.UUID_COOKIE_NAME);
-  if (TEST_MODE) {
+  if (TEST_ID) {
     logToConsole("cookie-uuids", uuids);
   }
 
@@ -839,7 +840,7 @@ function getUUIDFromCookie() {
   }
 
   if (oldestUUID) {
-    if (TEST_MODE) {
+    if (TEST_ID) {
       logToConsole("cookie-uuid-oldest", oldestUUID);
     }
     return makeString(oldestUUID);
@@ -848,7 +849,7 @@ function getUUIDFromCookie() {
 
 function getUUIDFromEvent(eventData) {
   const uuid = eventData[CONSTANTS.UUID_EVENT_NAME];
-  if (TEST_MODE) {
+  if (TEST_ID) {
     logToConsole("event-uuid", uuid);
   }
 
@@ -859,7 +860,7 @@ function getUUIDFromEvent(eventData) {
 
 function getEmailFromCookie() {
   const emails = getCookieValues(CONSTANTS.EMAIL_COOKIE_NAME);
-  if (TEST_MODE) {
+  if (TEST_ID) {
     logToConsole("cookie-email", emails);
   }
 
@@ -967,8 +968,6 @@ function getUserData(eventData) {
 function sendCAPIRequest(requestData) {
   const eventPayload = requestData.eventPayload;
   const integrationPartner = requestData.partner;
-  // Append advertiser ID to URL path
-  const url = CONSTANTS.API_CONVERSIONS_ENDPOINT + AD_ACCOUNT_ID;
 
   const headers = {
     "Content-Type": "application/json",
@@ -977,19 +976,22 @@ function sendCAPIRequest(requestData) {
   };
 
   const body = {
-    events: [eventPayload],
-    partner: integrationPartner,
-    partner_version: TEMPLATE_VERSION,
+    data: {
+      test_id: TEST_ID,
+      events: [eventPayload],
+      partner: integrationPartner,
+      partner_version: TEMPLATE_VERSION,
+    }
   };
 
   if (TEST_ID) {
-    body.test_id = TEST_ID;
-  } else {
-    body.test_mode = TEST_MODE;
+    logToConsole("url", CONSTANTS.API_CONVERSIONS_ENDPOINT);
+    logToConsole("headers", headers);
+    logToConsole("body", body);
   }
 
   return sendHttpRequest(
-    url,
+    CONSTANTS.API_CONVERSIONS_ENDPOINT,
     {
       method: "POST",
       timeout: CONSTANTS.API_CONVERSIONS_ENDPOINT_TIMEOUT,
@@ -1004,17 +1006,17 @@ function handleCAPIResponse(response) {
   const body = JSON.parse(response.body);
 
   if (statusCode >= 200 && statusCode < 300) {
-    if (TEST_MODE) {
+    if (TEST_ID) {
       logToConsole(
         "Conversion API request succeeded with message:",
-        body.message
+        body.data.message
       );
     }
 
     return data.gtmOnSuccess();
   } else {
     logToConsole("Conversion API request failed with status code:", statusCode);
-    logToConsole("Conversion API request failed with message:", body.message);
+    logToConsole("Conversion API request failed with error:", body.error);
     return data.gtmOnFailure();
   }
 }
@@ -1156,8 +1158,702 @@ ___SERVER_PERMISSIONS___
 
 ___TESTS___
 
-scenarios: []
-setup: ''
+scenarios:
+- name: Verify default populated event_at and partner info
+  code: "const testData = {};\n\nverifyCAPI((requestUrl, requestOptions, requestBody)\
+    \ => {\n  assertThat(JSON.parse(requestBody).data.events[0].event_at).isDefined();\n\
+    \  assertThat(JSON.parse(requestBody).data.partner).isEqualTo('SGTM');\n  assertThat(JSON.parse(requestBody).data.partner_version).isEqualTo('2.0.0');\n\
+    \  \n});\n\nrunCode(testData);"
+- name: When CAPI returns 200, gtmOnSuccess
+  code: |-
+    const testData = {};
+
+    mock('sendHttpRequest', (requestUrl, requestOptions, requestBody) => {
+      return Promise.create((resolve, reject) => {
+        resolve({ statusCode: 200, body: JSON.stringify(mockSuccessResponse)});
+      });
+    });
+
+    runCode(testData);
+
+    callLater(() => {
+      assertApi('gtmOnSuccess').wasCalled();
+      assertApi('gtmOnFailure').wasNotCalled();
+    });
+- name: When CAPI returns 400, gtmOnFailure
+  code: |-
+    const testData = {};
+
+    const mockErrorResponse = {
+      "error": {
+        "code": 401,
+        "message": "No bearer token provided."
+      }
+    };
+
+    mock('sendHttpRequest', (requestUrl, requestOptions, requestBody) => {
+      return Promise.create((resolve, reject) => {
+        resolve({ statusCode: 400, body: JSON.stringify(mockErrorResponse)});
+      });
+    });
+
+    runCode(testData);
+
+    callLater(() => {
+      assertApi('gtmOnSuccess').wasNotCalled();
+      assertApi('gtmOnFailure').wasCalled();
+    });
+- name: Given pixel ID, verify endpoint path
+  code: "const testData = {\n  id: 't2_123',\n};\n\nconst expectedUrl = 'https://ads-api.reddit.com/api/v3/pixels/'\
+    \ + testData.id + '/conversion_events';\n\nverifyCAPI((requestUrl, requestOptions,\
+    \ requestBody) => {\n  assertThat(requestUrl).isEqualTo(expectedUrl);\n  \n});\n\
+    \nrunCode(testData);"
+- name: Given standard eventType, verify tracking_type
+  code: |-
+    const testData = {
+      eventType: 'PageVisit',
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].type.tracking_type).isEqualTo('PAGE_VISIT');
+      assertThat(JSON.parse(requestBody).data.events[0].type.custom_event_name).isUndefined();
+    });
+
+    runCode(testData);
+- name: Given custom eventType, verify custom_event_name
+  code: |-
+    const testData = {
+      eventType: 'Custom',
+      customEventName: 'test_custom_event',
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].type.tracking_type).isEqualTo('CUSTOM');
+      assertThat(JSON.parse(requestBody).data.events[0].type.custom_event_name).isEqualTo('test_custom_event');
+    });
+
+    runCode(testData);
+- name: Given AUTOMATIC_GTM partner, verify tracking type not overriden
+  code: |-
+    const testData = {
+      eventType: 'add_to_cart',
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        integration_partner: "AUTOMATIC_GTM"
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].type.tracking_type).isEqualTo('add_to_cart');
+      assertThat(JSON.parse(requestBody).data.events[0].type.custom_event_name).isUndefined();
+    });
+
+    runCode(testData);
+- name: Given event click ID, verify click_id
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        rdt_cid: 'test_click_id',
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].click_id).isEqualTo('test_click_id');
+    });
+
+    runCode(testData);
+- name: Given event and cookie click ID, verify cookie overrides event
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        rdt_cid: 'test_click_id',
+      };
+    });
+
+    mock('getCookieValues', (key) => {
+      if (key == "_rdt_cid") {
+        return [
+          'click_id_1',
+          'click_id_2',
+        ];
+      }
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].click_id).isEqualTo('click_id_1');
+    });
+
+    runCode(testData);
+- name: Given event, cookie and URL click ID, verify URL overrides all
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        rdt_cid: 'test_click_id',
+        page_location: "https://sample.com/?rdt_cid=url_click_id"
+      };
+    });
+
+    mock('getCookieValues', (key) => {
+      if (key == "_rdt_cid") {
+        return [
+          'click_id_1',
+          'click_id_2',
+        ];
+      }
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].click_id).isEqualTo('url_click_id');
+    });
+
+    runCode(testData);
+- name: Given only event currency, verify currency in metadata
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        currency: 'USD',
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.currency).isEqualTo('USD');
+    });
+
+    runCode(testData);
+- name: Given both tag and event currency, verify tag definition overrides event
+  code: |-
+    const testData = {
+      currency: 'USD',
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        currency: 'CAD',
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.currency).isEqualTo('USD');
+    });
+
+    runCode(testData);
+- name: Given only event value, verify value in metadata
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        value: 10.99,
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.value).isEqualTo(10.99);
+    });
+
+    runCode(testData);
+- name: Given both tag trasactionValue and event value, verify tag definition overrides
+    event
+  code: |-
+    const testData = {
+      transactionValue: 10.99,
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        value: 1.99,
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.value).isEqualTo(10.99);
+    });
+
+    runCode(testData);
+- name: Given only event item_count, verify item_count in metadata
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        item_count: 2
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.item_count).isEqualTo(2);
+    });
+
+    runCode(testData);
+- name: Given both tag itemCount and event item_count, verify tag defeinition overrides
+    event
+  code: |-
+    const testData = {
+      itemCount: 2
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        item_count: 1
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.item_count).isEqualTo(2);
+    });
+
+    runCode(testData);
+- name: Given event ecommerce_items, verify products override event item_count
+  code: |-
+    const testData = {};
+
+    const items = [
+      {
+        item_id: '1',
+        item_name: 'product_a',
+        item_category: 'a1',
+        item_category2: 'a2',
+        item_category3: 'a3',
+        item_category4: 'a4',
+        item_category5: 'a5'
+      },
+      {
+        item_id: '2',
+        item_name: 'product_b',
+        item_category: 'b1',
+        item_category2: 'b2'
+      }
+    ];
+
+    mock('getAllEventData', () => {
+      return {
+        item_count: 1,
+        ecommerce_items: JSON.stringify(items)
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.item_count).isEqualTo(2);
+    });
+
+    runCode(testData);
+- name: Given event ecommerce_items, verify products override tag itemCount
+  code: |-
+    const testData = {
+      itemCount: 1
+    };
+
+    const items = [
+      {
+        item_id: '1',
+        item_name: 'product_a',
+        item_category: 'a1',
+        item_category2: 'a2',
+        item_category3: 'a3',
+        item_category4: 'a4',
+        item_category5: 'a5'
+      },
+      {
+        item_id: '2',
+        item_name: 'product_b',
+        item_category: 'b1',
+        item_category2: 'b2'
+      }
+    ];
+
+    mock('getAllEventData', () => {
+      return {
+        ecommerce_items: JSON.stringify(items)
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.item_count).isEqualTo(2);
+    });
+
+    runCode(testData);
+- name: Given tag productsRows, verify metadata products
+  code: |-
+    const testData = {
+      productInputType: 'entryManual',
+      productsRows: [
+        {
+          id: '1',
+          name: 'product_a',
+          category: 'a1 > a2 > a3 > a4 > a5'
+        },
+        {
+          id: '2',
+          name: 'product_b',
+          category: 'b1 > b2'
+        }
+      ]
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].id).isEqualTo('1');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].name).isEqualTo('product_a');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].category).isEqualTo('a1 > a2 > a3 > a4 > a5');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].id).isEqualTo('2');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].name).isEqualTo('product_b');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].category).isEqualTo('b1 > b2');
+    });
+
+    runCode(testData);
+- name: Given tag productsJSON, verify metadata products
+  code: |-
+    const products = [
+      {
+        id: '1',
+        name: 'product_a',
+        category: 'a1 > a2 > a3 > a4 > a5'
+      },
+      {
+        id: '2',
+        name: 'product_b',
+        category: 'b1 > b2'
+      }
+    ];
+
+    const testData = {
+      productInputType: 'entryJSON',
+      productsJSON: JSON.stringify(products)
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].id).isEqualTo('1');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].name).isEqualTo('product_a');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].category).isEqualTo('a1 > a2 > a3 > a4 > a5');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].id).isEqualTo('2');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].name).isEqualTo('product_b');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].category).isEqualTo('b1 > b2');
+    });
+
+    runCode(testData);
+- name: Given event ecommerce_items, verify metadata products
+  code: |-
+    const testData = {};
+
+    const items = [
+      {
+        item_id: '1',
+        item_name: 'product_a',
+        item_category: 'a1',
+        item_category2: 'a2',
+        item_category3: 'a3',
+        item_category4: 'a4',
+        item_category5: 'a5'
+      },
+      {
+        item_id: '2',
+        item_name: 'product_b',
+        item_category: 'b1',
+        item_category2: 'b2'
+      }
+    ];
+
+    mock('getAllEventData', () => {
+      return {
+        ecommerce_items: JSON.stringify(items)
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].id).isEqualTo('1');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].name).isEqualTo('product_a');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].category).isEqualTo('a1 > a2 > a3 > a4 > a5');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].id).isEqualTo('2');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].name).isEqualTo('product_b');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].category).isEqualTo('b1 > b2');
+    });
+
+    runCode(testData);
+- name: Given event product_data string, verify metadata products
+  code: |-
+    const products = [
+      {
+        id: '1',
+        name: 'product_a',
+        category: 'a1 > a2 > a3 > a4 > a5'
+      },
+      {
+        id: '2',
+        name: 'product_b',
+        category: 'b1 > b2'
+      }
+    ];
+
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        product_data: JSON.stringify(products)
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].id).isEqualTo('1');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].name).isEqualTo('product_a');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].category).isEqualTo('a1 > a2 > a3 > a4 > a5');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].id).isEqualTo('2');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].name).isEqualTo('product_b');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].category).isEqualTo('b1 > b2');
+    });
+
+    runCode(testData);
+- name: Given event product_data array, verify metadata products
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        product_data: [
+          {
+            id: '1',
+            name: 'product_a',
+            category: 'a1 > a2 > a3 > a4 > a5'
+          },
+          {
+            id: '2',
+            name: 'product_b',
+            category: 'b1 > b2'
+          }
+        ]
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].id).isEqualTo('1');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].name).isEqualTo('product_a');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[0].category).isEqualTo('a1 > a2 > a3 > a4 > a5');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].id).isEqualTo('2');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].name).isEqualTo('product_b');
+      assertThat(JSON.parse(requestBody).data.events[0].metadata.products[1].category).isEqualTo('b1 > b2');
+    });
+
+    runCode(testData);
+- name: Given event UUID, verify user
+  code: |-
+    const testData = {
+      enableFirstPartyCookies: true,
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        rdt_uuid: "test_uuid"
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.uuid).isEqualTo('test_uuid');
+    });
+
+    runCode(testData);
+- name: Given both cookie and event UUID, verify cookie oldest UUID overrides event
+  code: |-
+    const testData = {
+      enableFirstPartyCookies: true,
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        rdt_uuid: "dummy_uuid"
+      };
+    });
+
+    mock('getCookieValues', (key) => {
+      if (key == "_rdt_uuid") {
+        return [
+          '2.new_uuid',
+          '1.oldest_uuid',
+        ];
+      }
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.uuid).isEqualTo('oldest_uuid');
+    });
+
+    runCode(testData);
+- name: Given event email and phone number, verify user has both
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        user_data: {
+          email_address: "dummy@example.com",
+          phone_number: "+11234567890",
+        }
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.email).isEqualTo('dummy@example.com');
+      assertThat(JSON.parse(requestBody).data.events[0].user.phone_number).isEqualTo('+11234567890');
+    });
+
+    runCode(testData);
+- name: Given both tag and event user data, verify tag params override event
+  code: |-
+    const testData = {
+      advancedMatching: true,
+      advancedMatchingParams: [
+        {
+          name: "email",
+          value: "dummy@example.com",
+        },
+        {
+          name: "phone_number",
+          value: "+11234567890",
+        }
+      ]
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        user_data: {
+          email_address: "dummy@test.com",
+          phone_number: "+10987654321",
+        }
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.email).isEqualTo('dummy@example.com');
+      assertThat(JSON.parse(requestBody).data.events[0].user.phone_number).isEqualTo('+11234567890');
+    });
+
+    runCode(testData);
+- name: Given advanced matching IDs, verify user has all IDs
+  code: |-
+    const testData = {
+      advancedMatching: true,
+      advancedMatchingParams: [
+        {
+          name: "aaid",
+          value: "test_aaid",
+        },
+        {
+          name: "externalId",
+          value: "test_external_id",
+        },
+        {
+          name: "idfa",
+          value: "test_idfa",
+        }
+      ]
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.aaid).isEqualTo('test_aaid');
+      assertThat(JSON.parse(requestBody).data.events[0].user.external_id).isEqualTo('test_external_id');
+      assertThat(JSON.parse(requestBody).data.events[0].user.idfa).isEqualTo('test_idfa');
+    });
+
+    runCode(testData);
+- name: Given data processing options, verify user has data processing options
+  code: |-
+    const testData = {
+      dataProcessingOptions: true,
+      limitedDataUsageOptions: true,
+      ldu_country: "US",
+      ldu_region: "US-CA",
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.data_processing_options.modes[0]).isEqualTo('LDU');
+      assertThat(JSON.parse(requestBody).data.events[0].user.data_processing_options.country).isEqualTo('US');
+      assertThat(JSON.parse(requestBody).data.events[0].user.data_processing_options.region).isEqualTo('US-CA');
+    });
+
+    runCode(testData);
+- name: Given event ip_override, verify user has ip_address
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        ip_override: "123.456.78.90",
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.ip_address).isEqualTo('123.456.78.90');
+    });
+
+    runCode(testData);
+- name: Given event user_agent, verify user has user_agent
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        user_agent: "test_user_agent",
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.user_agent).isEqualTo('test_user_agent');
+    });
+
+    runCode(testData);
+- name: Given event screen_resolution, verify user has screen_dimensions
+  code: |-
+    const testData = {};
+
+    mock('getAllEventData', () => {
+      return {
+        screen_resolution: "1920x1080",
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.screen_dimensions.width).isEqualTo(1920);
+      assertThat(JSON.parse(requestBody).data.events[0].user.screen_dimensions.height).isEqualTo(1080);
+    });
+
+    runCode(testData);
+- name: Given conversion access token, verify request header has bearer token
+  code: |-
+    const testData = {
+      conversionToken: "test_capi_token"
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(requestOptions.headers.Authorization).isEqualTo('Bearer ' + testData.conversionToken);
+    });
+
+    runCode(testData);
+setup: |-
+  const JSON = require('JSON');
+  const Promise = require('Promise');
+  const callLater = require('callLater');
+
+  const mockSuccessResponse = {
+    "data": {
+      "message": "Successfully processed 1 conversion events."
+    }
+  };
+
+  function verifyCAPI(verify) {
+    return mock('sendHttpRequest', (requestUrl, requestOptions, requestBody) => {
+      verify(requestUrl, requestOptions, requestBody);
+      return Promise.create((resolve, reject) => {
+        resolve({ statusCode: 200, body: JSON.stringify(mockSuccessResponse)});
+      });
+    });
+  }
 
 
 ___NOTES___
