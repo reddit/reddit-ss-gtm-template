@@ -2,9 +2,11 @@ homepage: "https://www.redditinc.com/advertising"
 documentation: "https://business.reddithelp.com/s/article/Set-Up-a-Server-Container"
 versions:
   # Latest Version
+  - sha: 8bcefdd90792d65ab72779bfaefb247ef8714656
+    changeNotes: Update to CAPI v3. Note that test_mode is deprecated, use test_id instead for Event Testing.
+  # Older Versions
   - sha: caf60faf193c7fca47d5b00f945b632867e13de2
     changeNotes: Add support for event_data parameters
-  # Older Versions
   - sha: b9eb9f63cb3e4eeac9b25a09e1edd23a0f9ad538
     changeNotes: Add test_id parameter for Event Testing support
   - sha: 0a92cabe2ee582326a115414d8a36c19315ac8c2
