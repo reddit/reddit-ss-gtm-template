@@ -895,8 +895,8 @@ function getUserData(eventData) {
 
   user.phone_number =
     eventData.user_data &&
-    (makeString(eventData.user_data.phone_number) ||
-      makeString(eventData.user_data.sha256_phone_number));
+    ((eventData.user_data.phone_number && makeString(eventData.user_data.phone_number)) ||
+      (eventData.user_data.sha256_phone_number && makeString(eventData.user_data.sha256_phone_number)));
 
   if (
     data.advancedMatching &&
