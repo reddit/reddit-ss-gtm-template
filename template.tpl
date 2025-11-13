@@ -888,15 +888,21 @@ function getUserData(eventData) {
     }
   }
 
-  user.email =
-    eventData.user_data &&
-    (makeString(eventData.user_data.email_address) ||
-      makeString(eventData.user_data.sha256_email_address));
+  if (eventData.user_data) {
+    const email =
+      eventData.user_data.email_address ||
+      eventData.user_data.sha256_email_address;
+    if (email) {
+      user.email = makeString(email);
+    }
 
-  user.phone_number =
-    eventData.user_data &&
-    (makeString(eventData.user_data.phone_number) ||
-      makeString(eventData.user_data.sha256_phone_number));
+    const phoneNumber =
+      eventData.user_data.phone_number ||
+      eventData.user_data.sha256_phone_number;
+    if (phoneNumber) {
+      user.phone_number = makeString(phoneNumber);
+    }
+  }
 
   if (
     data.advancedMatching &&
@@ -1835,6 +1841,67 @@ scenarios:
     });
 
     runCode(testData);
+- name: Given no email in user_data, verify email is not set in user object
+  code: |
+    const testData = {};
+
+    mock("getAllEventData", () => {
+      return {
+        user_data: {
+          phone_number: "+11234567890",
+        },
+      };
+    });
+
+    verifyCAPI(function (requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.email).isUndefined();
+      assertThat(
+        JSON.parse(requestBody).data.events[0].user.phone_number
+      ).isEqualTo("+11234567890");
+    });
+
+    runCode(testData);
+- name: Given no phone_number in user_data, verify phone_number is not set in user
+    object
+  code: |
+    const testData = {};
+
+    mock("getAllEventData", () => {
+      return {
+        user_data: {
+          email_address: "dummy@example.com",
+        },
+      };
+    });
+
+    verifyCAPI(function (requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.email).isEqualTo(
+        "dummy@example.com"
+      );
+      assertThat(
+        JSON.parse(requestBody).data.events[0].user.phone_number
+      ).isUndefined();
+    });
+
+    runCode(testData);
+- name: Given empty user_data object, verify email and phone_number are not set
+  code: |
+    const testData = {};
+
+    mock("getAllEventData", () => {
+      return {
+        user_data: {},
+      };
+    });
+
+    verifyCAPI(function (requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].user.email).isUndefined();
+      assertThat(
+        JSON.parse(requestBody).data.events[0].user.phone_number
+      ).isUndefined();
+    });
+
+    runCode(testData);
 setup: |-
   const JSON = require('JSON');
   const Promise = require('Promise');
@@ -1860,3 +1927,5 @@ ___NOTES___
 
 Created on 01/11/2023, 00:00:00
 Updated on 29/11/2023, 00:00:00
+
+
