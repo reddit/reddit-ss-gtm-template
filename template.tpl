@@ -478,6 +478,7 @@ const encodeUriComponent = require("encodeUriComponent");
 const getAllEventData = require("getAllEventData");
 const getContainerVersion = require("getContainerVersion");
 const getCookieValues = require("getCookieValues");
+const setCookie = require("setCookie");
 const getTimestampMillis = require("getTimestampMillis");
 const getType = require("getType");
 const logToConsole = require("logToConsole");
@@ -515,6 +516,7 @@ const CONSTANTS = {
   CLICK_ID_COOKIE_NAME: "_rdt_cid",
   CLICK_ID_EVENT_NAME: "rdt_cid",
   CLICK_ID_URL_NAME: "rdt_cid",
+  CLICK_ID_COOKIE_EXPIRATION_SECONDS: 90 * 24 * 60 * 60, // 90 days in seconds
 
   EMAIL_COOKIE_NAME: "_rdt_em",
 
@@ -555,6 +557,8 @@ function collectEventData() {
     const eventType = getEventType(integrationPartner);
 
     const clickId = getClickId(eventData);
+    
+    setClickIdCookie(clickId);
 
     const eventMetadata = getEventMetadata(config, eventData);
 
@@ -660,6 +664,23 @@ function getClickIdFromCookie() {
 
   if (clickID) {
     return makeString(clickID);
+  }
+}
+
+function setClickIdCookie(clickId) {
+  if (clickId && data.enableFirstPartyCookies) {
+    setCookie(CONSTANTS.CLICK_ID_COOKIE_NAME, clickId, {
+      domain: "auto",
+      path: "/",
+      samesite: "strict",
+      httpOnly: false,
+      "max-age": CONSTANTS.CLICK_ID_COOKIE_EXPIRATION_SECONDS,
+      secure: true,
+    });
+
+    if (TEST_ID) {
+      logToConsole("set-cookie-cid", clickId);
+    }
   }
 }
 
@@ -1156,6 +1177,75 @@ ___SERVER_PERMISSIONS___
         "versionId": "1"
       },
       "param": []
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "set_cookies",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "allowedCookies",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "name"
+                  },
+                  {
+                    "type": 1,
+                    "string": "domain"
+                  },
+                  {
+                    "type": 1,
+                    "string": "path"
+                  },
+                  {
+                    "type": 1,
+                    "string": "secure"
+                  },
+                  {
+                    "type": 1,
+                    "string": "session"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "_rdt_cid"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
     },
     "isRequired": true
   }
@@ -1902,6 +1992,179 @@ scenarios:
     });
 
     runCode(testData);
+- name: Given URL click ID and enableFirstPartyCookies true, verify cookie is set
+  code: |
+    const testData = {
+      enableFirstPartyCookies: true,
+    };
+
+    let cookieWasSet = false;
+    let cookieName = "";
+    let cookieValue = "";
+    let cookieOptions = {};
+
+    mock("getAllEventData", () => {
+      return {
+        page_location: "https://example.com/?rdt_cid=test_click_id_123",
+      };
+    });
+
+    mock("setCookie", (name, value, options) => {
+      cookieWasSet = true;
+      cookieName = name;
+      cookieValue = value;
+      cookieOptions = options;
+    });
+
+    verifyCAPI(function (requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].click_id).isEqualTo(
+        "test_click_id_123"
+      );
+    });
+
+    runCode(testData);
+
+    callLater(() => {
+      assertThat(cookieWasSet).isEqualTo(true);
+      assertThat(cookieName).isEqualTo("_rdt_cid");
+      assertThat(cookieValue).isEqualTo("test_click_id_123");
+      assertThat(cookieOptions.domain).isEqualTo("auto");
+      assertThat(cookieOptions.path).isEqualTo("/");
+      assertThat(cookieOptions.samesite).isEqualTo("strict");
+      assertThat(cookieOptions.secure).isEqualTo(true);
+      assertThat(cookieOptions.httpOnly).isEqualTo(false);
+      assertThat(cookieOptions["max-age"]).isEqualTo(7776000);
+    });
+- name: Given URL click ID and enableFirstPartyCookies false, verify cookie is not
+    set
+  code: |
+    const testData = {
+      enableFirstPartyCookies: false,
+    };
+
+    let cookieWasSet = false;
+
+    mock("getAllEventData", () => {
+      return {
+        page_location: "https://example.com/?rdt_cid=test_click_id_123",
+      };
+    });
+
+    mock("setCookie", (name, value, options) => {
+      cookieWasSet = true;
+    });
+
+    verifyCAPI(function (requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].click_id).isEqualTo(
+        "test_click_id_123"
+      );
+    });
+
+    runCode(testData);
+
+    callLater(() => {
+      assertThat(cookieWasSet).isEqualTo(false);
+    });
+- name: Given existing cookie click ID, verify cookie is refreshed with same value
+  code: |
+    const testData = {
+      enableFirstPartyCookies: true,
+    };
+
+    let cookieWasSet = false;
+    let cookieValue = "";
+
+    mock("getAllEventData", () => {
+      return {
+        page_location: "https://example.com/page2",
+      };
+    });
+
+    mock("getCookieValues", (key) => {
+      if (key == "_rdt_cid") {
+        return ["existing_click_id"];
+      }
+    });
+
+    mock("setCookie", (name, value, options) => {
+      cookieWasSet = true;
+      cookieValue = value;
+    });
+
+    verifyCAPI(function (requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].click_id).isEqualTo(
+        "existing_click_id"
+      );
+    });
+
+    runCode(testData);
+
+    callLater(() => {
+      assertThat(cookieWasSet).isEqualTo(true);
+      assertThat(cookieValue).isEqualTo("existing_click_id");
+    });
+- name: Given URL and cookie click ID, verify URL overrides and cookie is updated
+  code: |
+    const testData = {
+      enableFirstPartyCookies: true,
+    };
+
+    let cookieValue = "";
+
+    mock("getAllEventData", () => {
+      return {
+        page_location: "https://example.com/?rdt_cid=new_click_id",
+      };
+    });
+
+    mock("getCookieValues", (key) => {
+      if (key == "_rdt_cid") {
+        return ["old_click_id"];
+      }
+    });
+
+    mock("setCookie", (name, value, options) => {
+      cookieValue = value;
+    });
+
+    verifyCAPI(function (requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].click_id).isEqualTo(
+        "new_click_id"
+      );
+    });
+
+    runCode(testData);
+
+    callLater(() => {
+      assertThat(cookieValue).isEqualTo("new_click_id");
+    });
+- name: Given no click ID anywhere, verify cookie is not set
+  code: |
+    const testData = {
+      enableFirstPartyCookies: true,
+    };
+
+    let cookieWasSet = false;
+
+    mock("getAllEventData", () => {
+      return {
+        page_location: "https://example.com/page",
+      };
+    });
+
+    mock("setCookie", (name, value, options) => {
+      cookieWasSet = true;
+    });
+
+    verifyCAPI(function (requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].click_id).isUndefined();
+    });
+
+    runCode(testData);
+
+    callLater(() => {
+      assertThat(cookieWasSet).isEqualTo(false);
+    });
 setup: |-
   const JSON = require('JSON');
   const Promise = require('Promise');
