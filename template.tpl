@@ -60,6 +60,31 @@ ___TEMPLATE_PARAMETERS___
     "macrosInSelect": true,
     "selectItems": [
       {
+        "displayValue": "Website",
+        "value": "WEBSITE"
+      },
+      {
+        "displayValue": "App",
+        "value": "APP"
+      },
+      {
+        "displayValue": "Physical Store",
+        "value": "PHYSICAL_STORE"
+      },
+      {
+        "displayValue": "Other",
+        "value": "OTHER"
+      }
+    ],
+    "displayName": "Source of Event",
+    "simpleValueType": true,
+    "name": "actionSource",
+    "type": "SELECT"
+  },
+  {
+    "macrosInSelect": true,
+    "selectItems": [
+      {
         "displayValue": "Page Visit",
         "value": "PageVisit"
       },
@@ -562,7 +587,7 @@ function collectEventData() {
 
     const mappedEventData = {
       event_at: eventAtMs,
-      action_source: "WEBSITE",
+      action_source: data.actionSource,
       type: eventType,
       click_id: clickId,
       metadata: eventMetadata,
