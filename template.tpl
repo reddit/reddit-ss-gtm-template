@@ -587,7 +587,7 @@ function collectEventData() {
 
     const mappedEventData = {
       event_at: eventAtMs,
-      action_source: data.actionSource,
+      action_source: data.actionSource || 'WEBSITE',
       type: eventType,
       click_id: clickId,
       metadata: eventMetadata,
