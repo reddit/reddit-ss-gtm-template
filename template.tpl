@@ -60,6 +60,31 @@ ___TEMPLATE_PARAMETERS___
     "macrosInSelect": true,
     "selectItems": [
       {
+        "displayValue": "Website",
+        "value": "WEBSITE"
+      },
+      {
+        "displayValue": "App",
+        "value": "APP"
+      },
+      {
+        "displayValue": "Physical Store",
+        "value": "PHYSICAL_STORE"
+      },
+      {
+        "displayValue": "Other",
+        "value": "OTHER"
+      }
+    ],
+    "displayName": "Source of Event",
+    "simpleValueType": true,
+    "name": "actionSource",
+    "type": "SELECT"
+  },
+  {
+    "macrosInSelect": true,
+    "selectItems": [
+      {
         "displayValue": "Page Visit",
         "value": "PageVisit"
       },
@@ -562,7 +587,7 @@ function collectEventData() {
 
     const mappedEventData = {
       event_at: eventAtMs,
-      action_source: "WEBSITE",
+      action_source: data.actionSource || 'WEBSITE',
       type: eventType,
       click_id: clickId,
       metadata: eventMetadata,
@@ -1214,6 +1239,50 @@ scenarios:
     \ + testData.id + '/conversion_events';\n\nverifyCAPI((requestUrl, requestOptions,\
     \ requestBody) => {\n  assertThat(requestUrl).isEqualTo(expectedUrl);\n  \n});\n\
     \nrunCode(testData);"
+- name: Given WEBSITE actionSource, verify action_source
+  code: |-
+    const testData = {
+      actionSource: 'WEBSITE',
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].action_source).isEqualTo('WEBSITE');
+    });
+
+    runCode(testData);
+- name: Given APP actionSource, verify action_source
+  code: |-
+    const testData = {
+      actionSource: 'APP',
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].action_source).isEqualTo('APP');
+    });
+
+    runCode(testData);
+- name: Given PHYSICAL_STORE actionSource, verify action_source
+  code: |-
+    const testData = {
+      actionSource: 'PHYSICAL_STORE',
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].action_source).isEqualTo('PHYSICAL_STORE');
+    });
+
+    runCode(testData);
+- name: Given OTHER actionSource, verify action_source
+  code: |-
+    const testData = {
+      actionSource: 'OTHER',
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].action_source).isEqualTo('OTHER');
+    });
+
+    runCode(testData);
 - name: Given standard eventType, verify tracking_type
   code: |-
     const testData = {
