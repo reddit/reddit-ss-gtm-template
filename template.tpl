@@ -592,6 +592,7 @@ function collectEventData() {
     const mappedEventData = {
       event_at: eventAtMs,
       action_source: data.actionSource || 'WEBSITE',
+      event_source_url: eventData.page_location,
       type: eventType,
       click_id: clickId,
       metadata: eventMetadata,
@@ -1370,6 +1371,22 @@ scenarios:
 
     verifyCAPI(function(requestUrl, requestOptions, requestBody) {
       assertThat(JSON.parse(requestBody).data.events[0].action_source).isEqualTo('OTHER');
+    });
+
+    runCode(testData);
+- name: Given page_location, verify event_source_url
+  code: |-
+    const testData = {
+    };
+
+    mock('getAllEventData', () => {
+      return {
+        page_location: "https://example.com"
+      };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      assertThat(JSON.parse(requestBody).data.events[0].event_source_url).isEqualTo('https://example.com');
     });
 
     runCode(testData);
