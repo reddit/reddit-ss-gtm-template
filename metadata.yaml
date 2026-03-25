@@ -2,9 +2,11 @@ homepage: "https://www.redditinc.com/advertising"
 documentation: "https://business.reddithelp.com/s/article/Set-Up-a-Server-Container"
 versions:
   # Latest Version
+  - sha: 9208356141f79d249c634dfc4252bd28408b542a
+    changeNotes: Add event_source_url parameter for domain tracking
+  # Older Versions
   - sha: 2ec002df1f9e9e75b810103fb3f997c838addc25
     changeNotes: Add action_source parameter for Omnichannel support
-  # Older Versions
   - sha: 8bcefdd90792d65ab72779bfaefb247ef8714656
     changeNotes: Update to CAPI v3. Note that test_mode is deprecated, use test_id instead for Event Testing.
   - sha: caf60faf193c7fca47d5b00f945b632867e13de2
