@@ -2,9 +2,11 @@ homepage: "https://www.redditinc.com/advertising"
 documentation: "https://business.reddithelp.com/s/article/Set-Up-a-Server-Container"
 versions:
   # Latest Version
+  - sha: 2b2188ee1051990a0f5ba2779dbdafb24e9b8a42
+    changeNotes: Add support for p2 prefixed pixel IDs
+  # Older Versions
   - sha: 9208356141f79d249c634dfc4252bd28408b542a
     changeNotes: Add event_source_url parameter for domain tracking
-  # Older Versions
   - sha: 2ec002df1f9e9e75b810103fb3f997c838addc25
     changeNotes: Add action_source parameter for Omnichannel support
   - sha: 8bcefdd90792d65ab72779bfaefb247ef8714656
