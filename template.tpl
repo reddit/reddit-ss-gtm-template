@@ -445,7 +445,7 @@ ___TEMPLATE_PARAMETERS___
             "isUnique": false
           }
         ],
-        "help": "The Product ID and Product Category are required, but the Product Name is optional.",
+        "help": "A Product ID is required when using product ads or dynamic product ads (DPAs), and it must match the corresponding product ID in your catalog.",
         "enablingConditions": [
           {
             "paramName": "productInputType",
@@ -466,7 +466,7 @@ ___TEMPLATE_PARAMETERS___
             "type": "EQUALS"
           }
         ],
-        "help": "The Product ID and Product Category are required, but the Product Name is optional. Format: [ { \"id\": \"Product_ID\", \"name\": \"Product_Name\",  \"category\": \"Product_Category\" }, ... ]"
+        "help": "A Product ID is required when using product ads or dynamic product ads (DPAs), and it must match the corresponding product ID in your catalog. Format: [ { \"id\": \"Product_ID\", \"name\": \"Product_Name\",  \"category\": \"Product_Category\" }, ... ]"
       }
     ],
     "groupStyle": "ZIPPY_CLOSED"
@@ -2276,5 +2276,4 @@ ___NOTES___
 
 Created on 01/11/2023, 00:00:00
 Updated on 29/11/2023, 00:00:00
-
 
