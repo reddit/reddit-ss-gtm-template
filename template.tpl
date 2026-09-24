@@ -443,6 +443,18 @@ ___TEMPLATE_PARAMETERS___
             "type": "TEXT",
             "valueHint": "For example, Google\u0027s product taxonomy",
             "isUnique": false
+          },
+          {
+            "defaultValue": "",
+            "displayName": "Item Price",
+            "name": "itemPrice",
+            "type": "TEXT"
+          },
+          {
+            "defaultValue": "",
+            "displayName": "Quantity",
+            "name": "quantity",
+            "type": "TEXT"
           }
         ],
         "help": "A Product ID is required when using product ads or dynamic product ads (DPAs), and it must match the corresponding product ID in your catalog.",
@@ -466,7 +478,7 @@ ___TEMPLATE_PARAMETERS___
             "type": "EQUALS"
           }
         ],
-        "help": "A Product ID is required when using product ads or dynamic product ads (DPAs), and it must match the corresponding product ID in your catalog. Format: [ { \"id\": \"Product_ID\", \"name\": \"Product_Name\",  \"category\": \"Product_Category\" }, ... ]"
+        "help": "A Product ID is required when using product ads or dynamic product ads (DPAs), and it must match the corresponding product ID in your catalog. Format: [ { \"id\": \"Product_ID\", \"name\": \"Product_Name\",  \"category\": \"Product_Category\", \"itemPrice\":199,  \"quantity\": 1}, ... ]"
       }
     ],
     "groupStyle": "ZIPPY_CLOSED"
@@ -752,6 +764,8 @@ function processEcommerceItems(items) {
     if (item.item_name) product.name = makeString(item.item_name);
     let itemCategory = formatCategories(item);
     if (itemCategory) product.category = makeString(itemCategory);
+    if (item.quantity) product.quantity = makeString(item.quantity);
+    if (item.itemPrice) product.itemPrice = makeString(item.itemPrice);
 
     processedItems.push(product);
     let itemQuantity =
@@ -2251,6 +2265,74 @@ scenarios:
     callLater(() => {
       assertThat(cookieWasSet).isEqualTo(false);
     });
+- name: Given ecommerce items with numeric quantity, verify product fields
+  code: |-
+    const testData = {};
+    const items = [{ item_id: '1', quantity: 2 }, { item_id: '2', quantity: 3 }];
+
+    mock('getAllEventData', () => {
+      return { ecommerce_items: JSON.stringify(items) };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      const metadata = JSON.parse(requestBody).data.events[0].metadata;
+      assertThat(metadata.products[0].quantity).isEqualTo('2');
+      assertThat(metadata.products[1].quantity).isEqualTo('3');
+      assertThat(metadata.item_count).isEqualTo(5);
+    });
+
+    runCode(testData);
+- name: Given ecommerce items with numeric itemPrice, verify product fields
+  code: |-
+    const testData = {};
+    const items = [{ item_id: '1', itemPrice: 12.5 }, { item_id: '2', itemPrice: 7 }];
+
+    mock('getAllEventData', () => {
+      return { ecommerce_items: JSON.stringify(items) };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      const metadata = JSON.parse(requestBody).data.events[0].metadata;
+      assertThat(metadata.products[0].itemPrice).isEqualTo('12.5');
+      assertThat(metadata.products[1].itemPrice).isEqualTo('7');
+    });
+
+    runCode(testData);
+- name: Given ecommerce items with string quantity and itemPrice, verify product fields
+  code: |-
+    const testData = {};
+    const items = [{ item_id: '1', quantity: '2', itemPrice: '12.50' }];
+
+    mock('getAllEventData', () => {
+      return { ecommerce_items: JSON.stringify(items) };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      const metadata = JSON.parse(requestBody).data.events[0].metadata;
+      assertThat(metadata.products[0].quantity).isEqualTo('2');
+      assertThat(metadata.products[0].itemPrice).isEqualTo('12.50');
+      assertThat(metadata.item_count).isEqualTo(2);
+    });
+
+    runCode(testData);
+- name: Given ecommerce items with omitted quantity and itemPrice, verify product fields
+  code: |-
+    const testData = {};
+    const items = [{ item_id: '1' }];
+
+    mock('getAllEventData', () => {
+      return { ecommerce_items: JSON.stringify(items) };
+    });
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      const metadata = JSON.parse(requestBody).data.events[0].metadata;
+      assertThat(metadata.products[0].id).isEqualTo('1');
+      assertThat(metadata.products[0].quantity).isUndefined();
+      assertThat(metadata.products[0].itemPrice).isUndefined();
+      assertThat(metadata.item_count).isEqualTo(1);
+    });
+
+    runCode(testData);
 setup: |-
   const JSON = require('JSON');
   const Promise = require('Promise');
