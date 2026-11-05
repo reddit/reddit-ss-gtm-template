@@ -510,6 +510,7 @@ ___TEMPLATE_PARAMETERS___
 ___SANDBOXED_JS_FOR_SERVER___
 
 const JSON = require("JSON");
+const Object = require("Object");
 const Promise = require("Promise");
 const encodeUriComponent = require("encodeUriComponent");
 const getAllEventData = require("getAllEventData");
@@ -792,7 +793,24 @@ function processProductData(config, eventData) {
     config.productsRows &&
     config.productsRows.length > 0
   ) {
-    finalProducts = config.productsRows;
+    finalProducts = [];
+    for (const row of config.productsRows) {
+      const product = {};
+      for (const key of Object.keys(row)) {
+        const value = row[key];
+        // Blank optional numeric inputs must be omitted, not sent as empty strings.
+        // Do not use a truthiness check: zero is a valid populated value.
+        if (
+          (key === "itemPrice" || key === "quantity") &&
+          (value === undefined || value === null ||
+            (getType(value) === "string" && value.trim() === ""))
+        ) {
+          continue;
+        }
+        product[key] = value;
+      }
+      finalProducts.push(product);
+    }
   } else if (config.productInputType === "entryJSON" && config.productsJSON) {
     finalProducts = JSON.parse(config.productsJSON);
     if (!finalProducts) {
@@ -2330,6 +2348,76 @@ scenarios:
       assertThat(metadata.products[0].quantity).isUndefined();
       assertThat(metadata.products[0].itemPrice).isUndefined();
       assertThat(metadata.item_count).isEqualTo(1);
+    });
+
+    runCode(testData);
+- name: Given manual products with blank numeric fields, omit them from the request
+  code: |-
+    const rows = [
+      { id: '1', name: '', category: '', itemPrice: '', quantity: '' },
+      { id: '2', itemPrice: '  ', quantity: '\t' }
+    ];
+    const testData = { productInputType: 'entryManual', productsRows: rows };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      const products = JSON.parse(requestBody).data.events[0].metadata.products;
+      assertThat(products.length).isEqualTo(2);
+      assertThat(products[0]).isEqualTo({ id: '1', name: '', category: '' });
+      assertThat(products[1]).isEqualTo({ id: '2' });
+      assertThat(rows[0].itemPrice).isEqualTo('');
+      assertThat(rows[0].quantity).isEqualTo('');
+    });
+
+    runCode(testData);
+- name: Given manual products with unset numeric fields, omit them from the request
+  code: |-
+    const testData = {
+      productInputType: 'entryManual',
+      productsRows: [
+        { id: '1' },
+        { id: '2', itemPrice: null, quantity: null },
+        { id: '3', itemPrice: undefined, quantity: undefined }
+      ]
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      const products = JSON.parse(requestBody).data.events[0].metadata.products;
+      assertThat(products).isEqualTo([{ id: '1' }, { id: '2' }, { id: '3' }]);
+    });
+
+    runCode(testData);
+- name: Given manual products with populated numeric fields, preserve values including zero
+  code: |-
+    const rows = [
+      { id: '1', itemPrice: 0, quantity: 0 },
+      { id: '2', itemPrice: '0', quantity: '0' },
+      { id: '3', name: 'Product', category: 'Cars', itemPrice: '12.50', quantity: '2' },
+      { id: '4', itemPrice: 12.5, quantity: 2 }
+    ];
+    const testData = { productInputType: 'entryManual', productsRows: rows };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      const products = JSON.parse(requestBody).data.events[0].metadata.products;
+      assertThat(products).isEqualTo(rows);
+    });
+
+    runCode(testData);
+- name: Given manual products with one blank numeric field, preserve the populated field
+  code: |-
+    const testData = {
+      productInputType: 'entryManual',
+      productsRows: [
+        { id: '1', itemPrice: '', quantity: '2' },
+        { id: '2', itemPrice: '12.50', quantity: '' }
+      ]
+    };
+
+    verifyCAPI(function(requestUrl, requestOptions, requestBody) {
+      const products = JSON.parse(requestBody).data.events[0].metadata.products;
+      assertThat(products).isEqualTo([
+        { id: '1', quantity: '2' },
+        { id: '2', itemPrice: '12.50' }
+      ]);
     });
 
     runCode(testData);
